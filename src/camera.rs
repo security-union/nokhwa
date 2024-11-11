@@ -28,7 +28,7 @@ use nokhwa_core::{
     },
 };
 use std::{borrow::Cow, collections::HashMap};
-use nokhwa_core::controls::{CameraControl, ControlValueSetter, KnownCameraControl};
+use nokhwa_core::properties::{CameraControl, ControlValueSetter, KnownCameraControl};
 
 /// The main `Camera` struct. This is the struct that abstracts over all the backends, providing a simplified interface for use.
 pub struct Camera {

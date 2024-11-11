@@ -100,7 +100,7 @@ resolver_cross_platform!(
 
 #[cfg(all(feature = "input-v4l", target_os = "linux"))]
 #[cfg_attr(feature = "docs-features", doc(cfg(feature = "input-v4l")))]
-pub use nokhwa_bindings_linux::V4LCaptureDevice;
+pub use v4l2_backend::V4L2CaptureDevice;
 #[cfg(any(
     all(feature = "input-msmf", target_os = "windows"),
     all(feature = "docs-only", feature = "docs-nolink", feature = "input-msmf")
@@ -164,6 +164,8 @@ mod browser_camera;
 // pub use network_camera::NetworkCamera;
 #[cfg(feature = "input-opencv")]
 mod opencv_backend;
+#[cfg(feature = "input-v4l")]
+mod v4l2_backend;
 
 #[cfg(feature = "input-opencv")]
 #[cfg_attr(feature = "docs-features", doc(cfg(feature = "input-opencv")))]

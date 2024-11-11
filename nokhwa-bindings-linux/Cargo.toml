@@ -8,6 +8,9 @@ description = "The V4L2 bindings crate for `nokhwa`"
 keywords = ["v4l", "v4l2", "linux", "capture", "webcam"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+v4l2 = ["v4l", "v4l2-sys-mit"]
+
 [dependencies]
 
 [dependencies.nokhwa-core]
@@ -15,5 +18,5 @@ version = "0.2"
 path = "../nokhwa-core"
 
 [target.'cfg(target_os="linux")'.dependencies]
-v4l = "0.14"
-v4l2-sys-mit = "0.3"
+v4l = { version = "0.14", optional = true }
+v4l2-sys-mit = { version = "0.3", optional = true }

@@ -98,8 +98,8 @@ impl TryFrom<CameraIndex> for usize {
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq)]
 pub struct Resolution {
-    pub width_x: u32,
-    pub height_y: u32,
+    width_x: u32,
+    height_y: u32,
 }
 
 impl Resolution {
@@ -180,97 +180,77 @@ impl Distance<u32> for Resolution {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
-pub struct FrameRate(pub f32);
+#[derive(Copy, Clone, Debug, Hash)]
+pub struct FrameRate {
+    numerator: u32,
+    denominator: u32
+}
 
 impl FrameRate {
-    #[must_use]
-    pub fn new(fps: f32) -> Self {
-        Self(fps)
+    pub fn new(numerator: u32, denominator: u32) -> Self {
+        Self {
+            numerator,
+            denominator,
+        }
     }
 
-    #[must_use]
-    pub fn frame_rate(&self) -> f32 {
-        self.0
+    pub fn frame_rate(fps: u32) -> Self {
+        Self {
+            numerator: fps,
+            denominator: 1,
+        }
     }
-}
 
-impl Deref for FrameRate {
-    type Target = f32;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    pub fn numerator(&self) -> u32 {
+        self.numerator
     }
-}
 
-impl DerefMut for FrameRate {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+    pub fn denominator(&self) -> u32 {
+        self.denominator
     }
-}
 
-impl Hash for FrameRate {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write_u32(self.0.to_bits());
-    }
 }
 
 impl Default for FrameRate {
     fn default() -> Self {
-        FrameRate(30.0)
+        FrameRate::new(30, 1)
     }
 }
 
 impl Display for FrameRate {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} FPS", self.0)
+        write!(f, "{}/{} FPS", self.numerator, self.denominator)
     }
 }
 
-impl Add for FrameRate {
-    type Output = FrameRate;
+impl Eq for FrameRate {}
 
-    fn add(self, rhs: Self) -> Self::Output {
-        (self.0 + rhs.0).into()
+impl PartialEq<Self> for FrameRate {
+    fn eq(&self, other: &Self) -> bool {
+        (self.numerator * other.denominator) == (other.numerator * self.numerator)
     }
 }
 
-impl Add for &FrameRate {
-    type Output = FrameRate;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        (self.0 + rhs.0).into()
+impl PartialOrd<Self> for FrameRate {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
+impl Ord for FrameRate {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.numerator == 0 && other.denominator == 0 {
+            return Ordering::Equal;
+        }
+        
+        if self.denominator == other.denominator {
+            return self.numerator.cmp(&other.numerator);
+        }
 
-impl Sub for FrameRate {
-    type Output = FrameRate;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        (self.0 - rhs.0).into()
+        (self.numerator * other.denominator).cmp(&(other.numerator * self.denominator))
     }
 }
 
-impl Sub for &FrameRate {
-    type Output = FrameRate;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        (self.0 - rhs.0).into()
-    }
-}
-
-impl From<f32> for FrameRate {
-    fn from(value: f32) -> Self {
-        Self(value)
-    }
-}
-
-impl From<FrameRate> for f32 {
-    fn from(value: FrameRate) -> Self {
-        value.0
-    }
-}
 
 /// This is a convenience struct that holds all information about the format of a webcam stream.
 /// It consists of a [`Resolution`], [`FrameFormat`], and a [`FrameRate`].
@@ -357,7 +337,7 @@ impl Default for CameraFormat {
         CameraFormat {
             resolution: Resolution::new(640, 480),
             format: FrameFormat::MJpeg,
-            frame_rate: FrameRate(30.),
+            frame_rate: FrameRate::default(),
         }
     }
 }
@@ -392,12 +372,12 @@ impl CameraInfo {
     // OK, i just checkeed back on this code. WTF was I on when I wrote `&(impl AsRef<str> + ?Sized)` ????
     // I need to get on the same shit that my previous self was on, because holy shit that stuff is strong as FUCK!
     // Finally fixed this insanity. Hopefully I didnt torment anyone by actually putting this in a stable release.
-    pub fn new(human_name: &str, description: &str, misc: &str, index: &CameraIndex) -> Self {
+    pub fn new(human_name: String, description: String, misc: String, index: CameraIndex) -> Self {
         CameraInfo {
-            human_name: human_name.to_string(),
-            description: description.to_string(),
-            misc: misc.to_string(),
-            index: index.clone(),
+            human_name,
+            description,
+            misc,
+            index,
         }
     }
 

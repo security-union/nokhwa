@@ -17,6 +17,8 @@
 use crate::{frame_format::FrameFormat, types::ApiBackend};
 use thiserror::Error;
 
+pub type NokhwaResult<T> = Result<T, NokhwaError>;
+
 /// All errors in `nokhwa`.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Error, Debug, Clone)]

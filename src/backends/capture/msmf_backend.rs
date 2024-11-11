@@ -26,7 +26,7 @@ use nokhwa_core::{
     },
 };
 use std::{borrow::Cow, collections::HashMap};
-use nokhwa_core::controls::{all_known_camera_controls, CameraControl, ControlValueSetter, KnownCameraControl};
+use nokhwa_core::properties::{all_known_camera_controls, CameraControl, ControlValueSetter, KnownCameraControl};
 
 /// The backend that deals with Media Foundation on Windows.
 /// To see what this does, please see [`CaptureTrait`].

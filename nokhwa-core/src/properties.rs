@@ -5,7 +5,7 @@ use std::{
 };
 use std::cmp::Ordering;
 use crate::error::NokhwaError;
-use crate::ranges::{ArrayRange, IndicatedRange, KeyValue, Options, Range, RangeValidationFailure, Simple, ValidatableRange};
+use crate::ranges::{ArrayRange, IndicatedRange, KeyValue, Options, RangeValidationFailure, Simple, ValidatableRange};
 
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ControlValidationFailure;
@@ -26,7 +26,7 @@ pub enum CameraPropertyId {
     Gamma,
     WhiteBalance,
     BacklightCompensation,
-    Gain,
+    ISO,
     Pan,
     Tilt,
     Zoom,
@@ -48,16 +48,18 @@ pub struct CameraProperties {
 
 macro_rules! def_camera_props {
     ( $($property:ident, )* ) => {
-        impl CameraProperties {
-            $(
-            pub fn paste::paste! { [<$property:snake>] } (&self) -> Option<&CameraPropertyDescriptor> {
-                self.props.get(&CameraPropertyId::$property)
+        paste::paste! {
+            impl CameraProperties {
+                $(
+                pub fn [<$property:snake>] (&self) -> Option<&CameraPropertyDescriptor> {
+                    self.props.get(&CameraPropertyId::$property)
+                }
+                
+                pub fn [<set_ $property:snake>] (&mut self, value: CameraPropertyValue) -> Result<(), NokhwaError> {
+                    self.props.set_property(&CameraPropertyId::$property, value)
+                }
+                )*
             }
-            
-            pub fn paste::paste! { [<set_ $property:snake>] } (&mut self, value: CameraPropertyValue) -> Result<(), NokhwaError> {
-                self.props.set_property(&CameraPropertyId::$property, value)
-            }
-            )*
         }
     };
 }
@@ -71,7 +73,7 @@ def_camera_props!(
     Gamma,
     WhiteBalance,
     BacklightCompensation,
-    Gain,
+    ISO,
     Pan,
     Tilt,
     Zoom,
@@ -107,38 +109,34 @@ impl CameraProperties {
 #[derive(Clone, Debug)]
 pub struct CameraPropertyDescriptor {
     flags: HashSet<CameraPropertyFlag>,
+    mode: CameraPropertyMode,
     range: CameraPropertyRange,
     value: CameraPropertyValue,
+    value_type: CameraPropertyValueType,
 }
 
 impl CameraPropertyDescriptor {
-    pub fn new(flags: &[CameraPropertyFlag], range: CameraPropertyRange, value: CameraPropertyValue) -> Self {
-        CameraPropertyDescriptor {
+    pub fn new(flags: &[CameraPropertyFlag], mode: CameraPropertyMode, range: CameraPropertyRange, value: CameraPropertyValue, value_type: CameraPropertyValueType) -> Result<Self, NokhwaError> {
+
+        if flags.contains(&CameraPropertyFlag::ReadOnly) && flags.contains(&CameraPropertyFlag::WriteOnly) {
+            return Err(NokhwaError::StructureError { structure: "CameraPropertyDescriptor".to_string(), error: "conflicting flags".to_string() })
+        }
+
+        Ok(CameraPropertyDescriptor {
             flags: HashSet::from(flags),
+            mode,
             range,
             value,
-        }
+            value_type,
+        })
     }
     
-    pub fn is_read_only(&self) -> Result<(), NokhwaError> {
-        if self.flags.contains(&CameraPropertyFlag::ReadOnly) {
-            return Err(NokhwaError::SetPropertyError {
-                property: "Flag".to_string(),
-                value: "N/A".to_string(),
-                error: "Read Only".to_string(),
-            })
-        }
-        Ok(())
+    pub fn is_read_only(&self) -> bool {
+        self.flags.contains(&CameraPropertyFlag::ReadOnly)
     }
     
-    pub fn is_write_only(&self) -> Result<(), NokhwaError> {
-        if self.flags.contains(&CameraPropertyFlag::WriteOnly) {
-            return Err(NokhwaError::GetPropertyError {
-                property: "Flag".to_string(),
-                error: "Write Only".to_string(),
-            })
-        }
-        Ok(())
+    pub fn is_write_only(&self) -> bool {
+        self.flags.contains(&CameraPropertyFlag::WriteOnly)
     }
     
     pub fn is_disabled(&self) -> Result<(), NokhwaError> {
@@ -151,6 +149,14 @@ impl CameraPropertyDescriptor {
     pub fn flags(&self) -> Result<&HashSet<CameraPropertyFlag>, NokhwaError> {
         self.is_disabled()?;
         Ok(&self.flags)
+    }
+
+    pub fn mode(&self) -> CameraPropertyMode {
+        self.mode
+    }
+
+    pub fn value_type(&self) -> CameraPropertyValueType {
+        self.value_type
     }
 
     pub fn range(&self) -> &CameraPropertyRange {
@@ -181,16 +187,34 @@ pub enum CameraCustomPropertyPlatformId {
     LongInteger(i128),
 }
 
+#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+pub enum CameraPropertyMode {
+    ///
+    None,
+    /// Automatically Set
+    Automatic,
+    /// Manually Set
+    Manual,
+    /// Continuously Set
+    Continuous,
+}
+
+#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+pub enum CameraPropertyValueType {
+    /// Relative
+    Relative,
+    /// Absolute
+    Absolute,
+    /// Unknown/Unused/Not Applicable
+    None,
+}
+
 /// The flags that a camera property may have.
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub enum CameraPropertyFlag {
-    /// This is automatically set - you need not interfere
-    Automatic,
-    /// This is manually set - you need to interfere
-    Manual,
-    /// The value is set continuously by the driver.
-    Continuous,
     /// The value may only be read from - any attempts to change the value will error.
     ReadOnly,
     /// The value can only be written to.
@@ -617,4 +641,40 @@ impl Display for CameraPropertyValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self:?}")
     }
+}
+
+#[macro_export]
+macro_rules! define_back_and_fourth_control {
+    ($id_type:ty, { $( $control:expr [ $mode:expr, $value_type:expr, $value:expr ] => $control_id:expr, )* }, $id_to_str:expr, $str_to_id:expr) => {
+        pub struct ControlIntermediate {
+            pub mode: Option<$id_type>,
+            pub value_type: Option<$id_type>,
+            pub value: $id_type,
+        }
+
+        impl ControlIntermediate {
+            pub fn
+        }
+        
+        // impl ControlIntermediate {
+        //     pub fn into_control(native_ctrl: $id_type) -> (crate::properties::CameraPropertyId, Option<crate::properties::CameraPropertyFlag>) {
+        //         match native_ctrl {
+        //             $(
+        //             $control_id => ($control, $flag)
+        //             )*
+        //             nc => (crate::properties::CameraPropertyId::Custom($id_to_str(nc)), None)
+        //         }
+        //     }
+        //
+        //     pub fn into_native(property_id: &crate::properties::CameraPropertyId, flag: Option<crate::properties::CameraPropertyFlag>) -> Option<$id_type> {
+        //         match (property_id, flag) {
+        //             $(
+        //                 ($control, $flag) => Some($control_id),
+        //             )*
+        //             (crate::properties::CameraPropertyId::Custom(str_id), _) => $str_to_id(str_id),
+        //             _ => None,
+        //         }
+        //     }
+        // }
+    };
 }

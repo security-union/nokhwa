@@ -31,5 +31,9 @@ pub mod types;
 pub mod decoders;
 pub mod utils;
 pub mod ranges;
-pub mod controls;
-mod capture;
+pub mod properties;
+pub mod capture;
+pub mod query;
+
+#[cfg(feature = "async")]
+pub mod stream;

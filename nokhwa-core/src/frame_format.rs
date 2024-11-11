@@ -21,12 +21,14 @@ use crate::types::ApiBackend;
 /// Describes a frame format (i.e. how the bytes themselves are encoded). Often called `FourCC`.
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum FrameFormat {
     // Compressed Formats
     H265,
     H264,
-    H263,
     Avc1,
+    H263,
+    Av1,
     Mpeg1,
     Mpeg2,
     Mpeg4,
@@ -35,40 +37,60 @@ pub enum FrameFormat {
     VP8,
     VP9,
 
-    // YCbCr formats
-    
-    Yuv444,
+    // YCbCr Formats
 
-    // -> 422 16 BPP
-    Yuyv422,
-    Uyvy422,
+    // 8 bit per pixel, 4:4:4
 
-    // 420
+    Ayuv444,
+
+    // -> 4:2:2
+    Yuyv422, // AKA YUY2
+    Uyvy422, // UYUV
+    Yvyu422,
+    Yv12,
+
+
+    // 4:2:0
     Nv12,
     Nv21,
-    Yv12,
     I420,
-    I422,
-    I444,
+
+    // 16:1:1
+
+    Yvu9,
 
     // Grayscale Formats
     Luma8,
     Luma16,
 
+    // Depth
+    Depth16,
+
     // RGB Formats
-    Rgb8,
-    RgbA8,
+    Rgb332,
+    Rgb555,
+    Rgb565,
+    
+    Rgb888,
+
+    RgbA8888,
+    ARgb8888,
+
+    // Bayer Formats
+    Bayer8,
+    Bayer16,
 
     // Custom
-    Custom(u128),
-    PlatformSpecificCustomFormat(PlatformSpecific),
+    Custom([u8; 8]),
 }
 
+// FIXME: Fix these frame format lists! Maybe move to using a macro..?
 impl FrameFormat {
     pub const ALL: &'static [FrameFormat] = &[
         FrameFormat::H263,
         FrameFormat::H264,
         FrameFormat::H265,
+        FrameFormat::Av1,
         FrameFormat::Avc1,
         FrameFormat::Mpeg1,
         FrameFormat::Mpeg2,
@@ -84,14 +106,15 @@ impl FrameFormat {
         FrameFormat::Yv12,
         FrameFormat::Luma8,
         FrameFormat::Luma16,
-        FrameFormat::Rgb8,
-        FrameFormat::RgbA8,
+        FrameFormat::Rgb332,
+        FrameFormat::RgbA8888,
     ];
 
     pub const COMPRESSED: &'static [FrameFormat] = &[
         FrameFormat::H263,
         FrameFormat::H264,
         FrameFormat::H265,
+        FrameFormat::Av1,
         FrameFormat::Avc1,
         FrameFormat::Mpeg1,
         FrameFormat::Mpeg2,
@@ -112,12 +135,13 @@ impl FrameFormat {
 
     pub const LUMA: &'static [FrameFormat] = &[FrameFormat::Luma8, FrameFormat::Luma16];
 
-    pub const RGB: &'static [FrameFormat] = &[FrameFormat::Rgb8, FrameFormat::RgbA8];
+    pub const RGB: &'static [FrameFormat] = &[FrameFormat::Rgb332, FrameFormat::RgbA8888];
     
     pub const COLOR_FORMATS: &'static [FrameFormat] = &[
         FrameFormat::H265,
         FrameFormat::H264,
         FrameFormat::H263,
+        FrameFormat::Av1,
         FrameFormat::Avc1,
         FrameFormat::Mpeg1,
         FrameFormat::Mpeg2,
@@ -131,8 +155,8 @@ impl FrameFormat {
         FrameFormat::Nv12,
         FrameFormat::Nv21,
         FrameFormat::Yv12,
-        FrameFormat::Rgb8,
-        FrameFormat::RgbA8,
+        FrameFormat::Rgb332,
+        FrameFormat::RgbA8888,
     ];
     
     pub const GRAYSCALE: &'static [FrameFormat] = &[FrameFormat::Luma8, FrameFormat::Luma16];
@@ -144,55 +168,30 @@ impl Display for FrameFormat {
     }
 }
 
-#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct PlatformSpecific {
-    backend: ApiBackend,
-    format: u128,
-}
-
-impl PlatformSpecific {
-    #[must_use]
-    pub fn new(backend: ApiBackend, format: u128) -> Self {
-        Self { backend, format }
-    }
-
-    #[must_use]
-    pub fn backend(&self) -> ApiBackend {
-        self.backend
-    }
-
-    #[must_use]
-    pub fn format(&self) -> u128 {
-        self.format
-    }
-
-    #[must_use]
-    pub fn as_tuple(&self) -> (ApiBackend, u128) {
-        (self.backend, self.format)
-    }
-}
-
-impl From<(ApiBackend, u128)> for PlatformSpecific {
-    fn from(value: (ApiBackend, u128)) -> Self {
-        PlatformSpecific::new(value.0, value.1)
-    }
-}
-
-impl From<PlatformSpecific> for (ApiBackend, u128) {
-    fn from(value: PlatformSpecific) -> Self {
-        value.as_tuple()
-    }
-}
-
-impl PartialEq<(ApiBackend, u128)> for PlatformSpecific {
-    fn eq(&self, other: &(ApiBackend, u128)) -> bool {
-        &self.as_tuple() == other
-    }
-}
-
-impl Display for PlatformSpecific {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
-    }
+#[macro_export]
+macro_rules! define_back_and_fourth_frame_format {
+    ($fourcc_type:ty, { $( $frame_format:expr => $value:literal, )* }, $func_u8_8_to_fcc:expr, $func_fcc_to_u8_8:expr, $value_to_fcc_type:expr) => {
+        pub struct FrameFormatIntermediate(pub $fourcc_type);
+        
+        impl FrameFormatIntermediate {
+            pub fn from_frame_format(frame_format: FrameFormat) -> Option<Self> {
+                match frame_format {
+                    $(
+                        $frame_format => Some(Self($value_to_fcc_type($value))),
+                    )*
+                    FrameFormat::Custom(cv) => Some($func_u8_8_to_fcc(cv))
+                    _ => None,
+                }
+            }
+            
+            pub fn into_frame_format(fourcc: $fourcc_type) -> FrameFormat {
+                match fourcc.0 {
+                    $(
+                         $value => $frame_format,
+                    )*
+                    cv => FrameFormat::Custom($func_fcc_to_u8_8(cv)),
+                }
+            }
+        }
+    };
 }

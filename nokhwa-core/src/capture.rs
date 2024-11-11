@@ -1,42 +1,52 @@
 use std::collections::HashMap;
 use crate::buffer::Buffer;
-use crate::controls::{CameraProperties, CameraPropertyId, CameraPropertyValue};
-use crate::error::NokhwaError;
-use crate::types::{CameraFormat, CameraIndex, Resolution};
+use crate::properties::{CameraProperties, CameraPropertyId, CameraPropertyValue};
+use crate::error::{NokhwaError, NokhwaResult};
+use crate::frame_format::FrameFormat;
+use crate::stream::CaptureStream;
+use crate::types::{CameraFormat, CameraIndex, FrameRate, Resolution};
 
 pub trait Open {
-    fn open(index: CameraIndex) -> Self; 
+    fn open(index: CameraIndex) -> NokhwaResult<Self>; 
 }
 
 #[cfg(feature = "async")]
 pub trait AsyncOpen {
-    async fn open_async(index: CameraIndex) -> Self;
+    async fn open_async(index: CameraIndex) -> NokhwaResult<Self>;
 }
 
 macro_rules! def_camera_props {
     ( $($property:ident, )* ) => {
-        $(
-        fn paste::paste! { [<$property:snake>] } (&self) -> Option<&CameraPropertyDescriptor> {
-            self.properties().paste::paste! { [<$property:snake>] }
+        paste::paste! {
+            $(
+            fn [<$property:snake>] (&self) -> Option<&CameraPropertyDescriptor> {
+                self.properties().[<$property:snake>]
+            }
+            
+            fn [<set_ $property:snake>]  (&mut self, value: CameraPropertyValue) -> Result<(), NokhwaError> {
+                self.properties().[<set_ $property:snake >](value)
+            }
+            )*
         }
-        
-        fn paste::paste! { [<set_ $property:snake>] } (&mut self, value: CameraPropertyValue) -> Result<(), NokhwaError>;
-        )*
     };
 }
 
 macro_rules! def_camera_props_async {
     ( $($property:ident, )* ) => {
-        $(
-        async fn paste::paste! { [<set_ $property:snake>] } (&mut self, value: CameraPropertyValue) -> Result<(), NokhwaError>;
-        )*
+        paste::paste! {
+            $(
+                async fn [<set_ $property:snake _async>] (&mut self, value: CameraPropertyValue) -> Result<(), NokhwaError> {
+                self.properties().[<set_ $property:snake >](value)
+            }
+            )*
+        }
     };
 }
 
 pub trait Setting {
-    fn enumerate_formats(&self) -> Vec<CameraFormat>;
+    fn enumerate_formats(&self) -> Result<Vec<CameraFormat>, NokhwaError>;
     
-    fn enumerate_formats_by_resolution(&self) -> HashMap<Resolution, CameraFormat>;
+    fn enumerate_resolution_and_frame_rates(&self, frame_format: FrameFormat) -> Result<HashMap<Resolution, Vec<FrameRate>>, NokhwaError>;
     
     fn set_format(&self, camera_format: CameraFormat) -> Result<(), NokhwaError>;
     
@@ -66,9 +76,9 @@ pub trait Setting {
 
 #[cfg(feature = "async")]
 pub trait AsyncSetting {
-    async fn set_format(&self, camera_format: CameraFormat) -> Result<(), NokhwaError>;
+    async fn set_format_async(&self, camera_format: CameraFormat) -> Result<(), NokhwaError>;
 
-    async fn set_property(&mut self, property: &CameraPropertyId, value: CameraPropertyValue) -> Result<(), NokhwaError>;
+    async fn set_property_async(&mut self, property: &CameraPropertyId, value: CameraPropertyValue) -> Result<(), NokhwaError>;
 
     def_camera_props_async!(
         Brightness,
@@ -91,10 +101,8 @@ pub trait AsyncSetting {
 }
 
 pub trait Stream {
-    fn open_stream(&mut self) -> Result<(), NokhwaError>;
-    
-    fn poll_frame(&mut self) -> Result<Buffer, NokhwaError>;
-    
+    fn open_stream(&mut self) -> Result<CaptureStream, NokhwaError>;
+
     fn close_stream(&mut self) -> Result<(), NokhwaError>;
 }
 
@@ -102,7 +110,7 @@ pub trait Stream {
 pub trait AsyncStream {
     async fn open_stream(&mut self) -> Result<(), NokhwaError>;
 
-    async fn poll_frame(&mut self) -> Result<Buffer, NokhwaError>;
+    async fn await_frame(&mut self) -> Result<Buffer, NokhwaError>;
 
     async fn close_stream(&mut self) -> Result<(), NokhwaError>;}
 
@@ -110,3 +118,5 @@ pub trait Capture: Open + Setting + Stream {}
 
 #[cfg(feature = "async")]
 pub trait AsyncCapture: Capture + AsyncOpen + AsyncSetting + AsyncStream {}
+
+

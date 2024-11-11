@@ -7,7 +7,7 @@ use serde::{de, Serialize};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{window, MediaDeviceInfo, MediaDevices, MediaStream, MediaStreamConstraints, MediaStreamTrack, MediaTrackConstraints, Navigator};
 use nokhwa_core::buffer::Buffer;
-use nokhwa_core::controls::{CameraControl, ControlValueSetter, KnownCameraControl};
+use nokhwa_core::properties::{CameraControl, ControlValueSetter, KnownCameraControl};
 use nokhwa_core::error::NokhwaError;
 use nokhwa_core::frame_format::FrameFormat;
 use nokhwa_core::traits::{AsyncCaptureTrait, AsyncOpenCaptureTrait, CaptureTrait, OpenCaptureTrait};
@@ -284,7 +284,7 @@ impl BrowserCaptureDevice {
             let frame_rate = track_settings_map.get("frameRate").as_f64().ok_or(NokhwaError::ConversionError("failed to get frameRate as f64".to_string()))?;
             let resolution_width = u32::from(track_settings_map.get("width").as_f64().ok_or(NokhwaError::ConversionError("failed to get width as f64".to_string()))?);
             let resolution_length = u32::from(track_settings_map.get("length").as_f64().ok_or(NokhwaError::ConversionError("failed to get length as f64".to_string()))?);
-            CameraFormat::new(Resolution::new(resolution_width, resolution_length), FrameFormat::Rgb8, frame_rate)
+            CameraFormat::new(Resolution::new(resolution_width, resolution_length), FrameFormat::Rgb332, frame_rate)
         };
 
         Ok(BrowserCaptureDevice { info, media_devices, media_stream, group_id, device_id, format })

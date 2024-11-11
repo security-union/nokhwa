@@ -34,7 +34,7 @@ use nokhwa_core::{
 use std::{ffi::CString, sync::Arc};
 
 use std::{borrow::Cow, collections::HashMap};
-use nokhwa_core::controls::{CameraControl, ControlValueSetter, KnownCameraControl};
+use nokhwa_core::properties::{CameraControl, ControlValueSetter, KnownCameraControl};
 
 /// The backend struct that interfaces with V4L2.
 /// To see what this does, please see [`CaptureTrait`].
