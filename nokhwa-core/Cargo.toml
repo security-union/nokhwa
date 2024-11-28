@@ -1,6 +1,6 @@
 [package]
 name = "nokhwa-core"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["l1npengtul <l1npengtul@protonmail.com>"]
 edition = "2021"
 description = "Core type definitions for nokhwa"
@@ -14,7 +14,7 @@ default = []
 serialize = ["serde"]
 wgpu-types = ["wgpu"]
 mjpeg = ["mozjpeg"]
-opencv-mat = ["opencv"]
+opencv-mat = ["opencv", "opencv/clang-runtime", "bytemuck"]
 docs-features = ["serialize", "wgpu-types", "mjpeg"]
 test-fail-warnings = []
 
@@ -33,12 +33,15 @@ features = ["derive"]
 optional = true
 
 [dependencies.wgpu]
-version = "22"
+version = "23"
 optional = true
 
 [dependencies.opencv]
 version = "0.93"
-default-features = false
+optional = true
+
+[dependencies.bytemuck]
+version = "1"
 optional = true
 
 [dependencies.mozjpeg]

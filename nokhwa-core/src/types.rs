@@ -166,7 +166,7 @@ impl RequestedFormat<'_> {
                         let res = x.resolution();
                         let x_diff = res.x() as i32 - c.resolution().x() as i32;
                         let y_diff = res.y() as i32 - c.resolution().y() as i32;
-                        let dist_no_sqrt = (x_diff.abs()).pow(2) + (y_diff.abs()).pow(2);
+                        let dist_no_sqrt = x_diff.abs().pow(2) + y_diff.abs().pow(2);
                         (dist_no_sqrt, res)
                     })
                     .collect::<Vec<(i32, Resolution)>>();
@@ -368,7 +368,6 @@ pub const fn color_frame_formats() -> &'static [FrameFormat] {
 /// Note: the [`Ord`] implementation of this struct is flipped from highest to lowest.
 /// # JS-WASM
 /// This is exported as `JSResolution`
-#[cfg_attr(feature = "output-wasm", wasm_bindgen)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq)]
 pub struct Resolution {
@@ -376,13 +375,11 @@ pub struct Resolution {
     pub height_y: u32,
 }
 
-#[cfg_attr(feature = "output-wasm", wasm_bindgen)]
 impl Resolution {
     /// Create a new resolution from 2 image size coordinates.
     /// # JS-WASM
     /// This is exported as a constructor for [`Resolution`].
     #[must_use]
-    #[cfg_attr(feature = "output-wasm", wasm_bindgen(constructor))]
     pub fn new(x: u32, y: u32) -> Self {
         Resolution {
             width_x: x,
@@ -394,7 +391,6 @@ impl Resolution {
     /// # JS-WASM
     /// This is exported as `get_Width`.
     #[must_use]
-    #[cfg_attr(feature = "output-wasm", wasm_bindgen(getter = Width))]
     #[inline]
     pub fn width(self) -> u32 {
         self.width_x
@@ -404,7 +400,6 @@ impl Resolution {
     /// # JS-WASM
     /// This is exported as `get_Height`.
     #[must_use]
-    #[cfg_attr(feature = "output-wasm", wasm_bindgen(getter = Height))]
     #[inline]
     pub fn height(self) -> u32 {
         self.height_y
@@ -412,7 +407,6 @@ impl Resolution {
 
     /// Get the x (width) of Resolution
     #[must_use]
-    #[cfg_attr(feature = "output-wasm", wasm_bindgen(skip))]
     #[inline]
     pub fn x(self) -> u32 {
         self.width_x
@@ -420,7 +414,6 @@ impl Resolution {
 
     /// Get the y (height) of Resolution
     #[must_use]
-    #[cfg_attr(feature = "output-wasm", wasm_bindgen(skip))]
     #[inline]
     pub fn y(self) -> u32 {
         self.height_y
@@ -553,7 +546,6 @@ impl Display for CameraFormat {
 /// `description` amd `misc` may contain information that may differ from backend to backend. Refer to each backend for details.
 /// `index` is a camera's index given to it by (usually) the OS usually in the order it is known to the system.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd)]
-#[cfg_attr(feature = "output-wasm", wasm_bindgen)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct CameraInfo {
     human_name: String,
@@ -562,16 +554,14 @@ pub struct CameraInfo {
     index: CameraIndex,
 }
 
-#[cfg_attr(feature = "output-wasm", wasm_bindgen(js_class = CameraInfo))]
 impl CameraInfo {
     /// Create a new [`CameraInfo`].
     /// # JS-WASM
     /// This is exported as a constructor for [`CameraInfo`].
     #[must_use]
-    #[cfg_attr(feature = "output-wasm", wasm_bindgen(constructor))]
     // OK, i just checkeed back on this code. WTF was I on when I wrote `&(impl AsRef<str> + ?Sized)` ????
     // I need to get on the same shit that my previous self was on, because holy shit that stuff is strong as FUCK!
-    // Finally fixed this insanity. Hopefully I didnt torment anyone by actually putting this in a stable release.
+    // Finally fixed this insanity. Hopefully I didn't torment anyone by actually putting this in a stable release.
     pub fn new(human_name: &str, description: &str, misc: &str, index: CameraIndex) -> Self {
         CameraInfo {
             human_name: human_name.to_string(),
@@ -585,10 +575,6 @@ impl CameraInfo {
     /// # JS-WASM
     /// This is exported as a `get_HumanReadableName`.
     #[must_use]
-    #[cfg_attr(
-    feature = "output-wasm",
-    wasm_bindgen(getter = HumanReadableName)
-    )]
     // yes, i know, unnecessary alloc this, unnecessary alloc that
     // but wasm bindgen
     pub fn human_name(&self) -> String {
@@ -598,10 +584,6 @@ impl CameraInfo {
     /// Set the device info's human name.
     /// # JS-WASM
     /// This is exported as a `set_HumanReadableName`.
-    #[cfg_attr(
-    feature = "output-wasm",
-    wasm_bindgen(setter = HumanReadableName)
-    )]
     pub fn set_human_name(&mut self, human_name: &str) {
         self.human_name = human_name.to_string();
     }
@@ -610,7 +592,6 @@ impl CameraInfo {
     /// # JS-WASM
     /// This is exported as a `get_Description`.
     #[must_use]
-    #[cfg_attr(feature = "output-wasm", wasm_bindgen(getter = Description))]
     pub fn description(&self) -> &str {
         self.description.borrow()
     }
@@ -618,7 +599,6 @@ impl CameraInfo {
     /// Set the device info's description.
     /// # JS-WASM
     /// This is exported as a `set_Description`.
-    #[cfg_attr(feature = "output-wasm", wasm_bindgen(setter = Description))]
     pub fn set_description(&mut self, description: &str) {
         self.description = description.to_string();
     }
@@ -627,7 +607,6 @@ impl CameraInfo {
     /// # JS-WASM
     /// This is exported as a `get_MiscString`.
     #[must_use]
-    #[cfg_attr(feature = "output-wasm", wasm_bindgen(getter = MiscString))]
     pub fn misc(&self) -> String {
         self.misc.clone()
     }
@@ -635,7 +614,6 @@ impl CameraInfo {
     /// Set the device info's misc.
     /// # JS-WASM
     /// This is exported as a `set_MiscString`.
-    #[cfg_attr(feature = "output-wasm", wasm_bindgen(setter = MiscString))]
     pub fn set_misc(&mut self, misc: &str) {
         self.misc = misc.to_string();
     }
@@ -644,7 +622,6 @@ impl CameraInfo {
     /// # JS-WASM
     /// This is exported as a `get_Index`.
     #[must_use]
-    #[cfg_attr(feature = "output-wasm", wasm_bindgen(getter = Index))]
     pub fn index(&self) -> &CameraIndex {
         &self.index
     }
@@ -652,7 +629,6 @@ impl CameraInfo {
     /// Set the device info's index.
     /// # JS-WASM
     /// This is exported as a `set_Index`.
-    #[cfg_attr(feature = "output-wasm", wasm_bindgen(setter = Index))]
     pub fn set_index(&mut self, index: CameraIndex) {
         self.index = index;
     }
@@ -662,7 +638,6 @@ impl CameraInfo {
     // /// If the index is not parsable as a `u32`, this will error.
     // /// # JS-WASM
     // /// This is exported as `get_Index_Int`
-    // #[cfg_attr(feature = "output-wasm", wasm_bindgen(getter = Index_Int))]
     // pub fn index_num(&self) -> Result<u32, NokhwaError> {
     //     match &self.index {
     //         CameraIndex::Index(i) => Ok(*i),
@@ -861,7 +836,7 @@ impl ControlValueDescription {
         }
     }
 
-    /// Verifies if the [setter](crate::types::ControlValueSetter) is valid for the provided [`ControlValueDescription`].
+    /// Verifies if the [setter](ControlValueSetter) is valid for the provided [`ControlValueDescription`].
     /// - `true` => Is valid.
     /// - `false` => Is not valid.
     ///
@@ -1468,7 +1443,7 @@ impl Display for ApiBackend {
 /// # Safety
 /// This function uses `unsafe`. The caller must ensure that:
 /// - The input data is of the right size, does not exceed bounds, and/or the final size matches with the initial size.
-#[cfg(all(feature = "mjpeg", not(target_arch = "wasm")))]
+#[cfg(all(feature = "mjpeg", not(target_arch = "wasm32")))]
 #[cfg_attr(feature = "docs-features", doc(cfg(feature = "mjpeg")))]
 #[inline]
 pub fn mjpeg_to_rgb(data: &[u8], rgba: bool) -> Result<Vec<u8>, NokhwaError> {
@@ -1521,7 +1496,7 @@ pub fn mjpeg_to_rgb(data: &[u8], rgba: bool) -> Result<Vec<u8>, NokhwaError> {
     Ok(scanlines_res)
 }
 
-#[cfg(not(all(feature = "mjpeg", not(target_arch = "wasm"))))]
+#[cfg(not(all(feature = "mjpeg", not(target_arch = "wasm32"))))]
 pub fn mjpeg_to_rgb(_data: &[u8], _rgba: bool) -> Result<Vec<u8>, NokhwaError> {
     Err(NokhwaError::NotImplementedError(
         "Not available on WASM".to_string(),
@@ -1531,7 +1506,7 @@ pub fn mjpeg_to_rgb(_data: &[u8], _rgba: bool) -> Result<Vec<u8>, NokhwaError> {
 /// Equivalent to [`mjpeg_to_rgb`] except with a destination buffer.
 /// # Errors
 /// If the decoding fails (e.g. invalid MJPEG stream), the buffer is not large enough, or you are doing this on `WebAssembly`, this will error.
-#[cfg(all(feature = "mjpeg", not(target_arch = "wasm")))]
+#[cfg(all(feature = "mjpeg", not(target_arch = "wasm32")))]
 #[cfg_attr(feature = "docs-features", doc(cfg(feature = "mjpeg")))]
 #[inline]
 pub fn buf_mjpeg_to_rgb(data: &[u8], dest: &mut [u8], rgba: bool) -> Result<(), NokhwaError> {
@@ -1591,7 +1566,7 @@ pub fn buf_mjpeg_to_rgb(data: &[u8], dest: &mut [u8], rgba: bool) -> Result<(), 
     Ok(())
 }
 
-#[cfg(not(all(feature = "mjpeg", not(target_arch = "wasm"))))]
+#[cfg(not(all(feature = "mjpeg", not(target_arch = "wasm32"))))]
 pub fn buf_mjpeg_to_rgb(_data: &[u8], _dest: &mut [u8], _rgba: bool) -> Result<(), NokhwaError> {
     Err(NokhwaError::NotImplementedError(
         "Not available on WASM".to_string(),

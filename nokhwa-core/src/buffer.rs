@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 use crate::{
     error::NokhwaError,
     pixel_format::FormatDecoder,
@@ -21,6 +20,8 @@ use crate::{
 };
 use bytes::Bytes;
 use image::ImageBuffer;
+#[cfg(feature = "opencv-mat")]
+use opencv::{boxed_ref::BoxedRef, core::Mat};
 
 /// A buffer returned by a camera to accommodate custom decoding.
 /// Contains information of Resolution, the buffer's [`FrameFormat`], and the buffer.
@@ -103,9 +104,11 @@ impl Buffer {
         )
     }
 
-    /// Decodes a image with allocation using the provided [`FormatDecoder`] into a [`Mat`](https://docs.rs/opencv/latest/opencv/core/struct.Mat.html).
+    /// Decodes an image with allocation using the provided [`FormatDecoder`] into a [`Mat`](https://docs.rs/opencv/latest/opencv/core/struct.Mat.html).
     ///
     /// Note that this does a clone when creating the buffer, to decouple the lifetime of the internal data to the temporary Buffer. If you want to avoid this, please see [`decode_opencv_mat`](Self::decode_opencv_mat).
+    ///
+    /// This is **NOT** coherent when the input data is not Gray8, GrayAlpha87, RGB8, or RGBA8
     /// # Errors
     /// Will error when the decoding fails, or `OpenCV` failed to create/copy the [`Mat`](https://docs.rs/opencv/latest/opencv/core/struct.Mat.html).
     /// # Safety
@@ -114,48 +117,17 @@ impl Buffer {
     /// Most notably, the `data` **must** stay in scope for the duration of the [`Mat`](https://docs.rs/opencv/latest/opencv/core/struct.Mat.html) or bad, ***bad*** things happen.
     #[cfg(feature = "opencv-mat")]
     #[cfg_attr(feature = "docs-features", doc(cfg(feature = "opencv-mat")))]
-    #[allow(clippy::cast_possible_wrap)]
     pub fn decode_opencv_mat<F: FormatDecoder>(
         &mut self,
-    ) -> Result<opencv::core::Mat, NokhwaError> {
-        use image::Pixel;
-        use opencv::core::{Mat, Mat_AUTO_STEP, CV_8UC1, CV_8UC2, CV_8UC3, CV_8UC4};
+    ) -> Result<BoxedRef<Mat>, NokhwaError> {
+        use crate::buffer::channel_defs::make_mat;
 
-        let array_type = match F::Output::CHANNEL_COUNT {
-            1 => CV_8UC1,
-            2 => CV_8UC2,
-            3 => CV_8UC3,
-            4 => CV_8UC4,
-            _ => {
-                return Err(NokhwaError::ProcessFrameError {
-                    src: FrameFormat::RAWRGB,
-                    destination: "OpenCV Mat".to_string(),
-                    error: "Invalid Decoder FormatDecoder Channel Count".to_string(),
-                })
-            }
-        };
-
-        unsafe {
-            // TODO: Look into removing this unnecessary copy.
-            let mat1 = Mat::new_rows_cols_with_data(
-                self.resolution.height_y as i32,
-                self.resolution.width_x as i32,
-                array_type,
-                self.buffer.as_ref().as_ptr().cast_mut().cast(),
-                Mat_AUTO_STEP,
-            )
-            .map_err(|why| NokhwaError::ProcessFrameError {
-                src: FrameFormat::RAWRGB,
-                destination: "OpenCV Mat".to_string(),
-                error: why.to_string(),
-            })?;
-
-            Ok(mat1)
-        }
+        make_mat::<F>(self.resolution, self.buffer())
     }
 
-    /// Decodes a image with allocation using the provided [`FormatDecoder`] into a [`Mat`](https://docs.rs/opencv/latest/opencv/core/struct.Mat.html).
+    /// Decodes an image with allocation using the provided [`FormatDecoder`] into a [`Mat`](https://docs.rs/opencv/latest/opencv/core/struct.Mat.html).
     ///
+    /// This is **NOT** coherent when the input data is not Gray8, GrayAlpha87, RGB8, or RGBA8
     /// # Errors
     /// Will error when the decoding fails, or `OpenCV` failed to create/copy the [`Mat`](https://docs.rs/opencv/latest/opencv/core/struct.Mat.html).
     #[cfg(feature = "opencv-mat")]
@@ -163,12 +135,13 @@ impl Buffer {
     #[allow(clippy::cast_possible_wrap)]
     pub fn decode_into_opencv_mat<F: FormatDecoder>(
         &mut self,
-        dst: &mut opencv::core::Mat,
+        dst: &mut Mat,
     ) -> Result<(), NokhwaError> {
         use image::Pixel;
         use opencv::core::{
             Mat, MatTraitConst, MatTraitManual, Scalar, CV_8UC1, CV_8UC2, CV_8UC3, CV_8UC4,
         };
+        use bytes::Buf;
 
         let array_type = match F::Output::CHANNEL_COUNT {
             1 => CV_8UC1,
@@ -241,4 +214,130 @@ impl Buffer {
 
         Ok(())
     }
+}
+
+/// Channel definitions and utilities for making Mat for OpenCV
+///
+/// You (probably) shouldn't use this.
+#[cfg(feature = "opencv-mat")]
+pub mod channel_defs {
+    use bytemuck::{cast_slice, Pod, Zeroable};
+    use image::Pixel;
+    use crate::error::NokhwaError;
+    use crate::pixel_format::FormatDecoder;
+    use crate::types::{FrameFormat, Resolution};
+
+    #[cfg(feature = "opencv-mat")]
+    #[cfg_attr(feature = "docs-features", doc(cfg(feature = "opencv-mat")))]
+    pub(crate) fn make_mat<F>(resolution: Resolution, data: &[u8]) -> Result<opencv::boxed_ref::BoxedRef<opencv::core::Mat>, NokhwaError> where F: FormatDecoder {
+        use crate::buffer::channel_defs::*;
+        use opencv::core::Mat;
+
+        let mat = match F::Output::CHANNEL_COUNT {
+            1 => Mat::new_rows_cols_with_data::<G8>(resolution.width() as i32, resolution.height() as i32, cast_slice(data)),
+            2 => Mat::new_rows_cols_with_data::<GA8>(resolution.width() as i32, resolution.height() as i32, cast_slice(data)),
+            3 => Mat::new_rows_cols_with_data::<RGB8>(resolution.width() as i32, resolution.height() as i32, cast_slice(data)),
+            4 => Mat::new_rows_cols_with_data::<RGBA8>(resolution.width() as i32, resolution.height() as i32, cast_slice(data)),
+            _ => {
+                return Err(NokhwaError::ProcessFrameError {
+                    src: FrameFormat::RAWRGB,
+                    destination: "OpenCV Mat".to_string(),
+                    error: "Invalid Decoder FormatDecoder Channel Count".to_string(),
+                })
+            }
+        };
+
+        match mat {
+            Ok(m) => Ok(m),
+            Err(why) => Err(NokhwaError::ProcessFrameError {
+                src: FrameFormat::RAWRGB,
+                destination: "OpenCV Mat".to_string(),
+                error: why.to_string(),
+            })
+        }
+    }
+
+
+    /// Three u8
+    #[repr(transparent)]
+    #[derive(Copy, Clone, Debug)]
+    pub struct RGB8 {
+        pub data: [u8; 3]
+    }
+
+    unsafe impl opencv::core::DataType for RGB8 {
+        fn opencv_depth() -> i32 {
+            1
+        }
+
+        fn opencv_channels() -> i32 {
+            3
+        }
+    }
+
+    unsafe impl Pod for RGB8 {}
+
+    unsafe impl Zeroable for RGB8 {}
+
+    /// Two u8
+    #[repr(transparent)]
+    #[derive(Copy, Clone, Debug)]
+    pub struct GA8 {
+        pub data: [u8; 2],
+    }
+
+    unsafe impl opencv::core::DataType for GA8 {
+        fn opencv_depth() -> i32 {
+            1
+        }
+
+        fn opencv_channels() -> i32 {
+            2
+        }
+    }
+
+    unsafe impl Zeroable for GA8 {}
+
+    unsafe impl Pod for GA8 {}
+
+    /// One u8
+    #[derive(Copy, Clone, Debug)]
+    pub struct G8 {
+        pub data: u8,
+    }
+
+    unsafe impl opencv::core::DataType for G8 {
+        fn opencv_depth() -> i32 {
+            1
+        }
+
+        fn opencv_channels() -> i32 {
+            1
+        }
+    }
+
+    unsafe impl Zeroable for G8 {}
+
+    unsafe impl Pod for G8 {}
+
+    /// Four u8
+    #[repr(transparent)]
+    #[derive(Copy, Clone, Debug)]
+    pub struct RGBA8 {
+        pub data: [u8; 4]
+    }
+
+    unsafe impl opencv::core::DataType for RGBA8 {
+        fn opencv_depth() -> i32 {
+            1
+        }
+
+        fn opencv_channels() -> i32 {
+            4
+        }
+    }
+
+    unsafe impl Zeroable for RGBA8 {}
+
+    unsafe impl Pod for RGBA8 {}
 }

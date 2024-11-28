@@ -33,7 +33,7 @@ input-v4l-no-arena-buffer = ["nokhwa-bindings-linux/no-arena-buffer"]
 input-native = ["input-avfoundation", "input-v4l", "input-msmf"]
 # Re-enable it once soundness has been proven + mozjpeg is updated to 0.9.x
 # input-uvc = ["uvc", "uvc/vendor", "usb_enumeration", "lazy_static"]
-input-opencv = ["opencv", "opencv/videoio", "opencv/rgb", "rgb", "nokhwa-core/opencv-mat"]
+input-opencv = ["opencv", "opencv/videoio", "opencv/rgb", "opencv/clang-runtime", "nokhwa-core/opencv-mat"]
 input-jscam = ["web-sys", "js-sys", "wasm-bindgen-futures", "wasm-bindgen", "wasm-rs-async-executor"]
 output-wgpu = ["wgpu", "nokhwa-core/wgpu-types"]
 #output-wasm = ["input-jscam"]
