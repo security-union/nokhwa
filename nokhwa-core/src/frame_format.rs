@@ -16,8 +16,6 @@
 
 use std::fmt::{Display, Formatter};
 
-use crate::types::ApiBackend;
-
 /// Describes a frame format (i.e. how the bytes themselves are encoded). Often called `FourCC`.
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
@@ -40,7 +38,6 @@ pub enum FrameFormat {
     // YCbCr Formats
 
     // 8 bit per pixel, 4:4:4
-
     Ayuv444,
 
     // -> 4:2:2
@@ -49,14 +46,12 @@ pub enum FrameFormat {
     Yvyu422,
     Yv12,
 
-
     // 4:2:0
     Nv12,
     Nv21,
     I420,
 
     // 16:1:1
-
     Yvu9,
 
     // Grayscale Formats
@@ -70,7 +65,7 @@ pub enum FrameFormat {
     Rgb332,
     Rgb555,
     Rgb565,
-    
+
     Rgb888,
 
     RgbA8888,
@@ -136,7 +131,7 @@ impl FrameFormat {
     pub const LUMA: &'static [FrameFormat] = &[FrameFormat::Luma8, FrameFormat::Luma16];
 
     pub const RGB: &'static [FrameFormat] = &[FrameFormat::Rgb332, FrameFormat::RgbA8888];
-    
+
     pub const COLOR_FORMATS: &'static [FrameFormat] = &[
         FrameFormat::H265,
         FrameFormat::H264,
@@ -158,7 +153,7 @@ impl FrameFormat {
         FrameFormat::Rgb332,
         FrameFormat::RgbA8888,
     ];
-    
+
     pub const GRAYSCALE: &'static [FrameFormat] = &[FrameFormat::Luma8, FrameFormat::Luma16];
 }
 
@@ -172,7 +167,7 @@ impl Display for FrameFormat {
 macro_rules! define_back_and_fourth_frame_format {
     ($fourcc_type:ty, { $( $frame_format:expr => $value:literal, )* }, $func_u8_8_to_fcc:expr, $func_fcc_to_u8_8:expr, $value_to_fcc_type:expr) => {
         pub struct FrameFormatIntermediate(pub $fourcc_type);
-        
+
         impl FrameFormatIntermediate {
             pub fn from_frame_format(frame_format: FrameFormat) -> Option<Self> {
                 match frame_format {
@@ -183,7 +178,7 @@ macro_rules! define_back_and_fourth_frame_format {
                     _ => None,
                 }
             }
-            
+
             pub fn into_frame_format(fourcc: $fourcc_type) -> FrameFormat {
                 match fourcc.0 {
                     $(

@@ -22,18 +22,16 @@
  */
 
 //! Core type definitions for `nokhwa`
-pub mod buffer;
+pub mod camera;
+pub mod decoder;
 pub mod error;
 pub mod format_request;
+pub mod frame_buffer;
 pub mod frame_format;
+pub mod properties;
+pub mod query;
+pub mod ranges;
 pub mod traits;
 pub mod types;
-pub mod decoders;
 pub mod utils;
-pub mod ranges;
-pub mod properties;
-pub mod capture;
-pub mod query;
-
-#[cfg(feature = "async")]
 pub mod stream;

@@ -13,7 +13,7 @@ use nokhwa_bindings_linux::{
     }
 };
 use nokhwa_core::{
-    capture::{Open, Setting},
+    camera::{Open, Setting},
     error::{NokhwaError, NokhwaResult},
     frame_format::FrameFormat,
     properties::CameraProperties,

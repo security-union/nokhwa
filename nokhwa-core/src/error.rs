@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 use crate::{frame_format::FrameFormat, types::ApiBackend};
+use std::fmt::{Debug};
 use thiserror::Error;
 
 pub type NokhwaResult<T> = Result<T, NokhwaError>;

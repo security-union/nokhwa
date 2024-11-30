@@ -1,43 +1,86 @@
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::{Arc, Mutex},
-    task::{Context, Poll},
-    sync::mpsc::Receiver
-};
-use futures::Stream as AsyncStreamTrait;
-use crate::{
-    buffer::Buffer,
-    error::NokhwaError
-};
+use crate::error::{NokhwaError, NokhwaResult};
+use crate::frame_buffer::FrameBuffer;
+use flume::Receiver;
+use futures::TryFutureExt;
+use std::sync::Arc;
 
-#[derive(Clone, Debug)]
-pub enum ChannelState {
-    Frame(Buffer),
-    Error(NokhwaError),
-    ClosedWithError(NokhwaError),
-    Closed,
+pub trait StreamInnerTrait {
+    fn receiver(&self) -> Arc<Receiver<FrameBuffer>>;
+    fn stop(&mut self) -> NokhwaResult<()>;
 }
 
-pub enum StreamType {
-    Channel(Arc<Receiver<ChannelState>>),
-    Callback(Arc<Mutex<Option<ChannelState>>>),
+pub struct Stream {
+    inner: Box<dyn StreamInnerTrait>,
 }
 
-pub struct CaptureStream {}
+impl Stream {
+    pub fn new(inner: Box<dyn StreamInnerTrait>) -> Self {
+        Self {
+            inner,
+        }
+    }
 
-impl Future for CaptureStream {
-    type Output = ChannelState;
+    // pub unsafe fn erase_lifetime(self) -> Stream<'static> {
+    //     Self {
+    //         inner: self.inner,
+    //         phantom_data: Default::default(),
+    //     }
+    // }
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        todo!()
+    pub fn poll_frame(&self) -> NokhwaResult<FrameBuffer> {
+        if self.inner.receiver().is_disconnected() {
+            return Err(NokhwaError::ReadFrameError(
+                "stream is disconnected!".to_string(),
+            ));
+        }
+
+        self.inner
+            .receiver()
+            .recv()
+            .map_err(|why| NokhwaError::ReadFrameError(why.to_string()))
+    }
+
+    pub fn try_poll_frame(&self) -> Option<NokhwaResult<FrameBuffer>> {
+        if self.inner.receiver().is_disconnected() {
+            return Some(Err(NokhwaError::ReadFrameError(
+                "stream is disconnected!".to_string(),
+            )));
+        }
+
+        if self.inner.receiver().is_empty() {
+            return None;
+        }
+
+        Some(
+            self.inner
+                .receiver()
+                .try_recv()
+                .map_err(|why| NokhwaError::ReadFrameError(why.to_string())),
+        )
+    }
+
+    #[cfg(feature = "async")]
+    pub async fn await_frame(&self) -> NokhwaResult<FrameBuffer> {
+        if self.inner.receiver().is_disconnected() {
+            return Err(NokhwaError::ReadFrameError(
+                "stream is disconnected!".to_string(),
+            ));
+        }
+
+        self.inner
+            .receiver()
+            .recv_async()
+            .map_err(|why| NokhwaError::ReadFrameError(why.to_string())).await
+    }
+
+    pub fn stop_stream(mut self) -> NokhwaResult<()> {
+        self.inner.stop()?;
+        Ok(())
     }
 }
 
-impl AsyncStreamTrait for CaptureStream {
-    type Item = ChannelState;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        todo!()
+impl Drop for Stream {
+    fn drop(&mut self) {
+        let _ = self.inner.stop();
     }
 }

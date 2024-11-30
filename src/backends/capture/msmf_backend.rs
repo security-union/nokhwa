@@ -15,7 +15,7 @@
  */
 use nokhwa_bindings_windows::wmf::MediaFoundationDevice;
 use nokhwa_core::{
-    buffer::Buffer,
+    frame_buffer::FrameBuffer,
     error::NokhwaError,
     pixel_format::RgbFormat,
     traits::CaptureTrait,
@@ -242,10 +242,10 @@ impl CaptureTrait for MediaFoundationCaptureDevice {
         self.inner.is_stream_open()
     }
 
-    fn frame(&mut self) -> Result<Buffer, NokhwaError> {
+    fn frame(&mut self) -> Result<FrameBuffer, NokhwaError> {
         self.refresh_camera_format()?;
         let self_ctrl = self.camera_format();
-        Ok(Buffer::new(
+        Ok(FrameBuffer::new(
             self_ctrl.resolution(),
             &self.inner.raw_bytes()?,
             self_ctrl.format(),

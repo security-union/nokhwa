@@ -15,7 +15,3 @@
  */
 
 // pub trait VirtualBackendTrait {}
-
-pub trait Distance<T> where T: PartialEq {
-    fn distance_from(&self, other: &Self) -> T;
-}

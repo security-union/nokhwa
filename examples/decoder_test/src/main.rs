@@ -1,4 +1,4 @@
-use nokhwa_core::buffer::Buffer;
+use nokhwa_core::frame_buffer::FrameBuffer;
 use nokhwa_core::pixel_format::RgbFormat;
 use nokhwa_core::types::{FrameFormat, Resolution};
 use std::fs::File;
@@ -11,7 +11,7 @@ fn main() {
         .read_to_end(&mut nv12)
         .unwrap();
 
-    let buffer = Buffer::new(Resolution::new(1920, 1080), &nv12, FrameFormat::NV12);
+    let buffer = FrameBuffer::new(Resolution::new(1920, 1080), &nv12, FrameFormat::NV12);
     buffer
         .decode_image::<RgbFormat>()
         .unwrap()

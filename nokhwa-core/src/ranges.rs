@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use core::fmt::{ Debug, Display, Formatter};
-use std::collections::hash_map::Keys;
-use std::hash::Hash;
-use std::ops::{Div, Sub};
 use crate::error::NokhwaError;
+use core::fmt::{Debug, Display, Formatter};
+use std::collections::hash_map::Keys;
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::ops::{Div, Rem, Sub};
 
 /// Failed to validate.
 #[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -22,27 +22,25 @@ pub trait ValidatableRange {
 ///
 /// Inclusive by default.
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
-pub struct Range<T>
-{
+pub struct Range<T> {
     minimum: Option<T>,
     lower_inclusive: bool,
     maximum: Option<T>,
     upper_inclusive: bool,
     preferred: T,
+    step: Option<T>,
 }
 
-impl<T> Range<T>
-where
-    T: Copy + Clone + Debug + PartialOrd + PartialEq,
-{
+impl<T> Range<T> where T: Copy {
     /// Create an upper and lower inclusive [`Range`]
-    pub fn new(preferred: T, min: Option<T>, max: Option<T>) -> Self {
+    pub fn new(preferred: T, min: Option<T>, max: Option<T>, step: Option<T>) -> Self {
         Self {
             minimum: min,
             lower_inclusive: true,
             maximum: max,
             upper_inclusive: true,
             preferred,
+            step,
         }
     }
 
@@ -52,6 +50,7 @@ where
         lower_inclusive: bool,
         max: Option<T>,
         upper_inclusive: bool,
+        step: Option<T>
     ) -> Self {
         Self {
             minimum: min,
@@ -59,6 +58,7 @@ where
             maximum: max,
             upper_inclusive,
             preferred,
+            step,
         }
     }
 
@@ -69,6 +69,7 @@ where
             maximum: None,
             upper_inclusive: true,
             preferred,
+            step: None,
         }
     }
 
@@ -83,6 +84,9 @@ where
     }
     pub fn set_upper_inclusive(&mut self, upper_inclusive: bool) {
         self.upper_inclusive = upper_inclusive;
+    }
+    pub fn set_step(&mut self, step: T) {
+        self.step = Some(step);
     }
     pub fn set_preferred(&mut self, preferred: T) {
         self.preferred = preferred;
@@ -102,13 +106,27 @@ where
     pub fn preferred(&self) -> T {
         self.preferred
     }
+    pub fn step(&self) -> Option<T> {
+        self.step
+    }
 }
 
-impl<T> ValidatableRange for Range<T> where T: PartialEq + PartialOrd {
+impl<T> ValidatableRange for Range<T>
+where
+    T: SimpleRangeItem,
+{
     type Validation = T;
 
-    fn validate(&self, value: Self::Validation) -> Result<(), RangeValidationFailure> {
-        num_range_validate(self.minimum.as_ref(), self.maximum.as_ref(), &self.preferred, self.lower_inclusive, self.upper_inclusive, &value)
+    fn validate(&self, value: &T) -> Result<(), RangeValidationFailure> {
+        num_range_validate(
+            self.minimum,
+            self.maximum,
+            self.preferred,
+            self.lower_inclusive,
+            self.upper_inclusive,
+            self.step,
+            *value,
+        )
     }
 }
 
@@ -123,107 +141,39 @@ where
             maximum: None,
             upper_inclusive: true,
             preferred: T::default(),
+            step: None,
         }
     }
 }
 
-impl<T> Display for Range<T> where T: Debug {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let lower_inclusive_char = bool_to_inclusive_char(self.lower_inclusive, false);
-        let upper_inclusive_char = bool_to_inclusive_char(self.upper_inclusive, true);
-        let default = default_to_string(&self.preferred);
-
-        write!(f, "Range: {lower_inclusive_char}{}, {}{upper_inclusive_char}, Preferred: {default}", self.minimum, self.maximum)
-    }
-}
-
-
-#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
-pub struct IndicatedRange<T> where T: Copy + Clone + Debug + PartialOrd + PartialEq {
-    minimum: T,
-    lower_inclusive: bool,
-    maximum: T,
-    upper_inclusive: bool,
-    step: Option<T>,
-    default: Option<T>,
-}
-
-impl<T> IndicatedRange<T>
+impl<T> Display for Range<T>
 where
-    T: Copy + Clone + Debug + PartialOrd + PartialEq
+    T: Debug,
 {
-    pub fn new(minimum: T, lower_inclusive: bool, maximum: T, upper_inclusive: bool, step: Option<T>, default: Option<T>) -> Self {
-        Self { minimum, lower_inclusive, maximum, upper_inclusive, step, default }
-    }
-
-    pub fn minimum(&self) -> T {
-        self.minimum
-    }
-
-    pub fn lower_inclusive(&self) -> bool {
-        self.lower_inclusive
-    }
-
-    pub fn maximum(&self) -> T {
-        self.maximum
-    }
-
-    pub fn upper_inclusive(&self) -> bool {
-        self.upper_inclusive
-    }
-
-    pub fn step(&self) -> Option<T> {
-        self.step
-    }
-
-    pub fn default_value(&self) -> Option<T> {
-        self.default
-    }
-}
-
-impl<T> ValidatableRange for IndicatedRange<T> where T: Copy + PartialEq + PartialOrd + Div<Output = T> + Sub<Output = T> + Number {
-    type Validation = T;
-
-    fn validate(&self, value: &Self::Validation) -> Result<(), RangeValidationFailure> {
-        if let Some(step) = &self.step {
-            let prepared_value = value - &self.minimum;
-            // We can check the step if we subtract the value from the minimum value
-            // then see if the remainder of prepared value and step is zero.
-            // e.g. 4, 12, value is 7, step is 3
-            // 7 - 4 = 3
-            // 3 % 3 = 0 Valid!
-            if prepared_value % step != 0 {
-                return Err(RangeValidationFailure::default())
-            }
-        }
-
-        num_range_validate(self.minimum.as_ref(), self.maximum.as_ref(), &self.default, self.lower_inclusive, self.upper_inclusive, &value)
-    }
-}
-
-impl<T> Display for IndicatedRange<T> where T: Debug {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let lower_inclusive_char = bool_to_inclusive_char(self.lower_inclusive, false);
         let upper_inclusive_char = bool_to_inclusive_char(self.upper_inclusive, true);
-        let default = default_to_string(&self.default);
-        let step = default_to_string(&self.step);
+        let default = &self.preferred;
 
-        // Ex) IndicatedRange: (5, 19], Step: 3, Default: 8
-        write!(f, "IndicatedRange: {lower_inclusive_char}{}, {}{upper_inclusive_char}, Step: {step}, Default: {default}", self.minimum, self.maximum)
+        write!(
+            f,
+            "Range: {lower_inclusive_char}{:?}, {:?}{upper_inclusive_char}, Preferred: {default:?}",
+            self.minimum, self.maximum
+        )
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct Options<T> where T: Clone + Debug {
+pub struct Options<T> {
     default: Option<T>,
     available: Vec<T>,
 }
 
 impl<T> Options<T>
 where
-    T: Clone + Debug + PartialEq
+    T: Clone + Debug + PartialEq,
 {
-    pub fn new(values: Vec<T>, default_value: T) -> Self {
+    pub fn new(values: Vec<T>, default_value: Option<T>) -> Self {
         Self {
             default: default_value,
             available: values,
@@ -239,7 +189,10 @@ where
     }
 }
 
-impl<T> ValidatableRange for Options<T> where T: PartialEq {
+impl<T> ValidatableRange for Options<T>
+where
+    T: Clone + PartialEq,
+{
     type Validation = T;
 
     fn validate(&self, value: &Self::Validation) -> Result<(), RangeValidationFailure> {
@@ -250,40 +203,53 @@ impl<T> ValidatableRange for Options<T> where T: PartialEq {
     }
 }
 
-impl<T> Display for Options<T> where T: Debug {
+impl<T> Display for Options<T>
+where
+    T: Debug,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let default = default_to_string(&self.default);
 
-        write!(f, "Options: Available {:?}, Default: {default}", self.available)
+        write!(
+            f,
+            "Options: Available {:?}, Default: {default}",
+            self.available
+        )
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct KeyValue<K, V> where K: Clone + Debug + Hash + Eq, V: Clone + Debug {
+pub struct KeyValue<K, V>
+where
+    K: Clone + Debug + Hash + Eq,
+    V: Clone + Debug,
+{
     defaults: HashMap<K, V>,
 }
 
 impl<K, V> KeyValue<K, V>
 where
     K: Clone + Debug + Hash + Eq,
-    V: Clone + Debug
+    V: Clone + Debug,
 {
     pub fn new(default: HashMap<K, V>) -> Self {
-        Self {
-            defaults: default,
-        }
+        Self { defaults: default }
     }
 
-    pub fn available_keys(&self) -> &Keys<'_, K, V> {
-        &self.defaults.keys()
+    pub fn available_keys(&self) -> Keys<'_, K, V> {
+        self.defaults.keys()
     }
-    
+
     pub fn by_key(&self, key: &K) -> Option<&V> {
         self.defaults.get(key)
     }
 }
 
-impl<K, V> Display for KeyValue<K, V> where K: Debug, V: Debug {
+impl<K, V> Display for KeyValue<K, V>
+where
+    K: Clone + Debug + Hash + Eq,
+    V: Clone + Debug,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // TODO: pretty print?
         write!(f, "Key Value Pairs: {:?}", self.defaults)
@@ -291,16 +257,19 @@ impl<K, V> Display for KeyValue<K, V> where K: Debug, V: Debug {
 }
 
 #[derive(Clone, Debug)]
-pub struct ArrayRange<T> where T: Clone + Debug {
+pub struct ArrayRange<T> {
     appendable_options: Vec<T>,
     default_options: Vec<T>,
 }
 
-impl<T> ArrayRange<T> where T: Clone + Debug + PartialEq {
+impl<T> ArrayRange<T>
+where
+    T: Clone + Debug + PartialEq,
+{
     pub fn new(appendable: Vec<T>, default: Vec<T>) -> Result<Self, NokhwaError> {
         for option in &default {
             if !appendable.contains(option) {
-                return Err(NokhwaError::StructureError { structure: "ArrayRange".to_string(), error: "Attempted to add an undependable option to default option - ILLEGAL! - If you got this while using a driver, this is a bug! Please report to https://github.com/l1npengtul/nokhwa/issues!".to_string() })
+                return Err(NokhwaError::StructureError { structure: "ArrayRange".to_string(), error: "Attempted to add an undependable option to default option - ILLEGAL! - If you got this while using a driver, this is a bug! Please report to https://github.com/l1npengtul/nokhwa/issues!".to_string() });
             }
         }
 
@@ -319,7 +288,10 @@ impl<T> ArrayRange<T> where T: Clone + Debug + PartialEq {
     }
 }
 
-impl<T> ValidatableRange for ArrayRange<T> where T: PartialEq {
+impl<T> ValidatableRange for ArrayRange<T>
+where
+    T: PartialEq,
+{
     type Validation = T;
 
     fn validate(&self, value: &Self::Validation) -> Result<(), RangeValidationFailure> {
@@ -330,22 +302,30 @@ impl<T> ValidatableRange for ArrayRange<T> where T: PartialEq {
     }
 }
 
-impl<T> Display for ArrayRange<T> where T: Debug {
+impl<T> Display for ArrayRange<T>
+where
+    T: Debug,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ArrayRange: Available Options: {:?}, Default: {:?}", self.appendable_options, self.default_options)
+        write!(
+            f,
+            "ArrayRange: Available Options: {:?}, Default: {:?}",
+            self.appendable_options, self.default_options
+        )
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct Simple<T> where T: Clone + Debug {
-    default: Option<T>
+pub struct Simple<T> {
+    default: Option<T>,
 }
 
-impl<T> Simple<T> where T: Clone + Debug {
+impl<T> Simple<T>
+where
+    T: Clone + Debug,
+{
     pub fn new(default: Option<T>) -> Self {
-        Self {
-            default,
-        }
+        Self { default }
     }
 
     pub fn default_value(&self) -> Option<&T> {
@@ -361,7 +341,10 @@ impl<T> ValidatableRange for Simple<T> {
     }
 }
 
-impl<T> Display for Simple<T> where T: Debug {
+impl<T> Display for Simple<T>
+where
+    T: Debug,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let default = default_to_string(&self.default);
         write!(f, "Simple (Any Value): Default Value: {default}")
@@ -370,12 +353,27 @@ impl<T> Display for Simple<T> where T: Debug {
 
 fn bool_to_inclusive_char(inclusive: bool, upper: bool) -> char {
     match inclusive {
-        true => if upper { ']' } else { '[' },
-        false => if upper { ')' } else { '(' },
+        true => {
+            if upper {
+                ']'
+            } else {
+                '['
+            }
+        }
+        false => {
+            if upper {
+                ')'
+            } else {
+                '('
+            }
+        }
     }
 }
 
-fn default_to_string<T>(default: &Option<T>) -> String where T: Debug {
+fn default_to_string<T>(default: &Option<T>) -> String
+where
+    T: Debug,
+{
     match default {
         Some(v) => {
             format!("{v:?}")
@@ -384,10 +382,33 @@ fn default_to_string<T>(default: &Option<T>) -> String where T: Debug {
     }
 }
 
+fn num_range_validate<T>(
+    minimum: Option<T>,
+    maximum: Option<T>,
+    default: T,
+    lower_inclusive: bool,
+    upper_inclusive: bool,
+    step: Option<T>,
+    value: T,
+) -> Result<(), RangeValidationFailure>
+where
+    T: SimpleRangeItem,
+{
 
-fn num_range_validate<T>(minimum: Option<&T>, maximum: Option<&T>, default: &T, lower_inclusive: bool, upper_inclusive: bool, value: &T) -> Result<(), RangeValidationFailure> where T: PartialEq + PartialOrd {
+    if let (Some(step), Some(min)) = (step, minimum) {
+        let prepared_value: T = value - min;
+        // We can check the step if we subtract the value from the minimum value
+        // then see if the remainder of prepared value and step is zero.
+        // e.g. 4, 12, value is 7, step is 3
+        // 7 - 4 = 3
+        // 3 % 3 = 0 Valid!
+        if prepared_value % step != T::ZERO {
+            return Err(RangeValidationFailure::default());
+        }
+    }
+
     if value == default {
-        return Ok(())
+        return Ok(());
     }
 
     if let Some(min) = minimum {
@@ -415,16 +436,24 @@ fn num_range_validate<T>(minimum: Option<&T>, maximum: Option<&T>, default: &T, 
     Ok(())
 }
 
-trait Number {}
-
-macro_rules! impl_num {
-    ( $($n:ty, )* ) => {
-        {
-            $(
-            impl Number for $n {}
-            )*
-        }
-    };
+pub trait SimpleRangeItem: Copy + Clone + Debug + Div<Output = Self> + Sub<Output = Self> + Rem<Output = Self> + PartialOrd + PartialEq {
+    const ZERO: Self;
 }
 
-impl_num!( i8, u8, i16, u16, i32, u32, i64, u64, i128, u128, f32, f64, );
+macro_rules! impl_num {
+    ($($n:ty)*) => ($(
+        impl SimpleRangeItem for $n {
+            const ZERO: $n = 0;
+        }
+    )*)
+}
+
+impl_num! { i8 u8 i16 u16 i32 u32 i64 u64 i128 u128 }
+
+impl SimpleRangeItem for f32 {
+    const ZERO: Self = 0_f32;
+}
+
+impl SimpleRangeItem for f64 {
+    const ZERO: Self = 0_f64;
+}

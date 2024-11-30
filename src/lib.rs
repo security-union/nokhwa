@@ -48,7 +48,7 @@ pub mod threaded;
 
 pub use camera::Camera;
 pub use init::*;
-pub use nokhwa_core::buffer::Buffer;
+pub use nokhwa_core::frame_buffer::FrameBuffer;
 pub use nokhwa_core::error::NokhwaError;
 pub use query::*;
 #[cfg(feature = "output-threaded")]
@@ -68,5 +68,5 @@ pub mod camera_traits {
 }
 
 pub mod buffer {
-    pub use nokhwa_core::buffer::*;
+    pub use nokhwa_core::frame_buffer::*;
 }

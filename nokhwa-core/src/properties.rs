@@ -1,11 +1,11 @@
-use serde::{Deserialize, Serialize};
-use std::{
-    fmt::{Display, Formatter},
-    collections::{HashMap, HashSet}
-};
-use std::cmp::Ordering;
 use crate::error::NokhwaError;
-use crate::ranges::{ArrayRange, IndicatedRange, KeyValue, Options, RangeValidationFailure, Simple, ValidatableRange};
+use crate::ranges::{ArrayRange, KeyValue, Options, Range, RangeValidationFailure, Simple, ValidatableRange};
+use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::{Display, Formatter},
+};
 
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ControlValidationFailure;
@@ -34,12 +34,18 @@ pub enum CameraPropertyId {
     Iris,
     Focus,
     Facing,
-    Custom(String)
+    Custom(String),
+}
+
+impl Display for CameraPropertyId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
 }
 
 // TODO: Replace Controls API with Properties. (this one)
 /// Properties of a Camera.
-/// 
+///
 /// If the property is not supported, it is `None`.
 /// Custom or platform-specific properties go into `other`
 pub struct CameraProperties {
@@ -54,9 +60,9 @@ macro_rules! def_camera_props {
                 pub fn [<$property:snake>] (&self) -> Option<&CameraPropertyDescriptor> {
                     self.props.get(&CameraPropertyId::$property)
                 }
-                
+
                 pub fn [<set_ $property:snake>] (&mut self, value: CameraPropertyValue) -> Result<(), NokhwaError> {
-                    self.props.set_property(&CameraPropertyId::$property, value)
+                    self.set_property(&CameraPropertyId::$property, value)
                 }
                 )*
             }
@@ -80,27 +86,29 @@ def_camera_props!(
     Exposure,
     Iris,
     Focus,
-    Facing, 
+    Facing,
 );
 
-impl CameraProperties { 
+impl CameraProperties {
     pub fn property(&self, property: &CameraPropertyId) -> Option<&CameraPropertyDescriptor> {
         self.props.get(property)
     }
 
-    pub fn set_property(&mut self, property: &CameraPropertyId, value: CameraPropertyValue) -> Result<(), NokhwaError> {
+    pub fn set_property(
+        &mut self,
+        property: &CameraPropertyId,
+        value: CameraPropertyValue,
+    ) -> Result<(), NokhwaError> {
         match self.props.get_mut(property) {
-            Some(prop) =>  {
+            Some(prop) => {
                 prop.set_value(value)?;
                 Ok(())
             }
-            None => {
-                Err(NokhwaError::SetPropertyError {
-                    property: property.to_string(),
-                    value: value.to_string(),
-                    error: String::from("Is null."),
-                })
-            }
+            None => Err(NokhwaError::SetPropertyError {
+                property: property.to_string(),
+                value: value.to_string(),
+                error: String::from("Is null."),
+            }),
         }
     }
 }
@@ -116,10 +124,20 @@ pub struct CameraPropertyDescriptor {
 }
 
 impl CameraPropertyDescriptor {
-    pub fn new(flags: &[CameraPropertyFlag], mode: CameraPropertyMode, range: CameraPropertyRange, value: CameraPropertyValue, value_type: CameraPropertyValueType) -> Result<Self, NokhwaError> {
-
-        if flags.contains(&CameraPropertyFlag::ReadOnly) && flags.contains(&CameraPropertyFlag::WriteOnly) {
-            return Err(NokhwaError::StructureError { structure: "CameraPropertyDescriptor".to_string(), error: "conflicting flags".to_string() })
+    pub fn new(
+        flags: &[CameraPropertyFlag],
+        mode: CameraPropertyMode,
+        range: CameraPropertyRange,
+        value: CameraPropertyValue,
+        value_type: CameraPropertyValueType,
+    ) -> Result<Self, NokhwaError> {
+        if flags.contains(&CameraPropertyFlag::ReadOnly)
+            && flags.contains(&CameraPropertyFlag::WriteOnly)
+        {
+            return Err(NokhwaError::StructureError {
+                structure: "CameraPropertyDescriptor".to_string(),
+                error: "conflicting flags".to_string(),
+            });
         }
 
         Ok(CameraPropertyDescriptor {
@@ -130,18 +148,21 @@ impl CameraPropertyDescriptor {
             value_type,
         })
     }
-    
+
     pub fn is_read_only(&self) -> bool {
         self.flags.contains(&CameraPropertyFlag::ReadOnly)
     }
-    
+
     pub fn is_write_only(&self) -> bool {
         self.flags.contains(&CameraPropertyFlag::WriteOnly)
     }
-    
+
     pub fn is_disabled(&self) -> Result<(), NokhwaError> {
         if self.flags.contains(&CameraPropertyFlag::Disabled) {
-            return Err(NokhwaError::StructureError { structure: "CameraPropertyDescriptor".to_string(), error: "Disabled".to_string() })
+            return Err(NokhwaError::StructureError {
+                structure: "CameraPropertyDescriptor".to_string(),
+                error: "Disabled".to_string(),
+            });
         }
         Ok(())
     }
@@ -168,11 +189,13 @@ impl CameraPropertyDescriptor {
     }
 
     pub fn set_value(&mut self, value: CameraPropertyValue) -> Result<(), NokhwaError> {
-        self.range.check_value(&value).map_err(|_| NokhwaError::SetPropertyError {
-            property: "CameraPropertyValue".to_string(),
-            value: value.to_string(),
-            error: "Bad Type".to_string(),
-        })?;
+        self.range
+            .check_value(&value)
+            .map_err(|_| NokhwaError::SetPropertyError {
+                property: "CameraPropertyValue".to_string(),
+                value: value.to_string(),
+                error: "Bad Type".to_string(),
+            })?;
         self.value = value;
         Ok(())
     }
@@ -239,18 +262,27 @@ impl Display for CameraPropertyFlag {
 pub enum CameraPropertyRange {
     Null,
     Boolean(Simple<bool>),
-    Integer(IndicatedRange<i64>),
-    LongInteger(IndicatedRange<i128>),
-    Float(IndicatedRange<f32>),
-    Double(IndicatedRange<f64>),
+    Integer(Range<i64>),
+    LongInteger(Range<i128>),
+    Float(Range<f32>),
+    Double(Range<f64>),
     String(Simple<String>),
     Array(ArrayRange<Vec<CameraPropertyValue>>),
     Enumeration(Options<CameraPropertyValue>),
     Binary(Simple<Vec<u8>>),
-    Pair(IndicatedRange<f32>, IndicatedRange<f32>),
-    Triple(IndicatedRange<f32>, IndicatedRange<f32>, IndicatedRange<f32>),
-    Quadruple(IndicatedRange<f32>, IndicatedRange<f32>, IndicatedRange<f32>, IndicatedRange<f32>),
-    KeyValuePair(KeyValue<String, CameraPropertyValue>)
+    Pair(Range<f32>, Range<f32>),
+    Triple(
+        Range<f32>,
+        Range<f32>,
+        Range<f32>,
+    ),
+    Quadruple(
+        Range<f32>,
+        Range<f32>,
+        Range<f32>,
+        Range<f32>,
+    ),
+    KeyValuePair(KeyValue<String, CameraPropertyValue>),
 }
 
 impl CameraPropertyRange {
@@ -258,7 +290,7 @@ impl CameraPropertyRange {
         match self {
             CameraPropertyRange::Null => {
                 if let CameraPropertyValue::Null = value {
-                    return Ok(())
+                    return Ok(());
                 }
             }
             CameraPropertyRange::Boolean(chk_b) => {
@@ -331,7 +363,7 @@ impl CameraPropertyRange {
                 if let CameraPropertyValue::KeyValue(st, va) = value {
                     if let Some(vk) = kv.by_key(st) {
                         if vk.is_same_type(va) {
-                            return Ok(())
+                            return Ok(());
                         }
                     }
                 }
@@ -361,7 +393,7 @@ pub enum CameraPropertyValue {
     Pair(f32, f32),
     Triple(f32, f32, f32),
     Quadruple(f32, f32, f32, f32),
-    KeyValue(String, Box<CameraPropertyValue>)
+    KeyValue(String, Box<CameraPropertyValue>),
 }
 
 impl CameraPropertyValue {
@@ -441,22 +473,22 @@ impl PartialEq for CameraPropertyValue {
             }
             CameraPropertyValue::Pair(a, b) => {
                 if let CameraPropertyValue::Pair(oa, ob) = other {
-                    return (a == oa) && (b == ob)
+                    return (a == oa) && (b == ob);
                 }
             }
             CameraPropertyValue::Triple(x, y, z) => {
                 if let CameraPropertyValue::Triple(ox, oy, oz) = other {
-                    return (x == ox) && (y == oy) && (z == oz)
+                    return (x == ox) && (y == oy) && (z == oz);
                 }
             }
             CameraPropertyValue::Quadruple(x, y, z, w) => {
                 if let CameraPropertyValue::Quadruple(ox, oy, oz, ow) = other {
-                    return (x == ox) && (y == oy) && (z == oz) && (w == ow)
+                    return (x == ox) && (y == oy) && (z == oz) && (w == ow);
                 }
             }
             CameraPropertyValue::KeyValue(k, v) => {
-                if let CameraPropertyValue::KeyValue(ok, ov ) = other {
-                    return (k == ok) && (v == ov)
+                if let CameraPropertyValue::KeyValue(ok, ov) = other {
+                    return (k == ok) && (v == ov);
                 }
             }
             _ => {}
@@ -468,145 +500,109 @@ impl PartialEq for CameraPropertyValue {
 impl PartialOrd for CameraPropertyValue {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match self {
-            CameraPropertyValue::Null => {
-                match other {
-                    CameraPropertyValue::Null => Some(Ordering::Greater),
-                    _ => Some(Ordering::Less)
+            CameraPropertyValue::Null => match other {
+                CameraPropertyValue::Null => Some(Ordering::Greater),
+                _ => Some(Ordering::Less),
+            },
+            CameraPropertyValue::Boolean(b) => match other {
+                CameraPropertyValue::Null => Some(Ordering::Greater),
+                CameraPropertyValue::Boolean(o) => {
+                    if o == b {
+                        Some(Ordering::Equal)
+                    } else if o {
+                        Some(Ordering::Less)
+                    } else {
+                        Some(Ordering::Greater)
+                    }
                 }
-            }
-            CameraPropertyValue::Boolean(b) => {
-                match other {
-                    CameraPropertyValue::Null => Some(Ordering::Greater),
-                    CameraPropertyValue::Boolean(o) => {
-                        if o == b {
-                            Some(Ordering::Equal)
-                        } else if o {
-                            Some(Ordering::Less)
-                        } else {
-                            Some(Ordering::Greater)
-                        }
-                    }
-                    _ => Some(Ordering::Less)
+                _ => Some(Ordering::Less),
+            },
+            CameraPropertyValue::Integer(int) => match other {
+                CameraPropertyValue::Null | CameraPropertyValue::Boolean(_) => {
+                    Some(Ordering::Greater)
                 }
-            }
-            CameraPropertyValue::Integer(int) => {
-                match other {
-                    CameraPropertyValue::Null | CameraPropertyValue::Boolean(_) => Some(Ordering::Greater),
-                    CameraPropertyValue::Integer(oth) => {
-                        Some(int.cmp(oth))
-                    }
-                    CameraPropertyValue::LongInteger(li) => {
-                        let long = match i64::try_from(li) {
-                            Ok(v) => v,
-                            Err(_) => return None,
-                        };
-                        Some(int.cmp(&long))
-                    }
-                    _ => Some(Ordering::Less),
+                CameraPropertyValue::Integer(oth) => Some(int.cmp(oth)),
+                CameraPropertyValue::LongInteger(li) => {
+                    let long = match i64::try_from(li) {
+                        Ok(v) => v,
+                        Err(_) => return None,
+                    };
+                    Some(int.cmp(&long))
                 }
-            }
-            CameraPropertyValue::LongInteger(long) => {
-                match other {
-                    CameraPropertyValue::Null | CameraPropertyValue::Boolean(_) => Some(Ordering::Greater),
-                    CameraPropertyValue::Integer(oth) => {
-                        Some(long.cmp(&(i128::from(oth))))
-                    }
-                    CameraPropertyValue::LongInteger(o) => {
-                        Some(long.cmp(o))
-                    }
-                    _ => Some(Ordering::Less),
+                _ => Some(Ordering::Less),
+            },
+            CameraPropertyValue::LongInteger(long) => match other {
+                CameraPropertyValue::Null | CameraPropertyValue::Boolean(_) => {
+                    Some(Ordering::Greater)
                 }
-            }
-            CameraPropertyValue::Float(fl) => {
-                match other {
-                    CameraPropertyValue::Null |
-                    CameraPropertyValue::Boolean(_) |
-                    CameraPropertyValue::Integer(_) |
-                    CameraPropertyValue::LongInteger(_) => Some(Ordering::Greater),
-                    CameraPropertyValue::Float(f) => {
-                        fl.partial_cmp(f)
-                    }
-                    CameraPropertyValue::Double(d) => {
-                        f64::from(fl).partial_cmp(d)
-                    }
-                    _ => Some(Ordering::Less),
-                }
-            }
-            CameraPropertyValue::Double(d) => {
-                match other {
-                    CameraPropertyValue::Null |
-                    CameraPropertyValue::Boolean(_) |
-                    CameraPropertyValue::Integer(_) |
-                    CameraPropertyValue::LongInteger(_) => Some(Ordering::Greater),
-                    CameraPropertyValue::Float(f) => {
-                        d.partial_cmp(&(f64::from(f)))
-                    }
-                    CameraPropertyValue::Double(o) => {
-                        d.partial_cmp(o)
-                    }
-                    _ => Some(Ordering::Less),
-                }
-            }
-            CameraPropertyValue::String(s) => {
-                match other {
-                    CameraPropertyValue::Null |
-                    CameraPropertyValue::Boolean(_) |
-                    CameraPropertyValue::Integer(_) |
-                    CameraPropertyValue::LongInteger(_) |
-                    CameraPropertyValue::Float(_) |
-                    CameraPropertyValue::Double(_) => Some(Ordering::Greater),
-                    CameraPropertyValue::String(os) => {
-                        s.partial_cmp(os)
-                    }
-                    _ => Some(Ordering::Less),
-                }
-            }
-            CameraPropertyValue::Array(a) => {
-                match other {
-                    CameraPropertyValue::Null |
-                    CameraPropertyValue::Boolean(_) |
-                    CameraPropertyValue::Integer(_) |
-                    CameraPropertyValue::LongInteger(_) |
-                    CameraPropertyValue::Float(_) |
-                    CameraPropertyValue::Double(_) |
-                    CameraPropertyValue::String(_) => Some(Ordering::Greater),
-                    CameraPropertyValue::Array(oa) => {
-                        a.partial_cmp(oa)
-                    }
-                    _ => Some(Ordering::Less),
-                }
-            }
-            CameraPropertyValue::EnumValue(_) => {
-                match other {
-                    CameraPropertyValue::Null |
-                    CameraPropertyValue::Boolean(_) |
-                    CameraPropertyValue::Integer(_) |
-                    CameraPropertyValue::LongInteger(_) |
-                    CameraPropertyValue::Float(_) |
-                    CameraPropertyValue::Double(_) |
-                    CameraPropertyValue::String(_) |
-                    CameraPropertyValue::Array(_) => Some(Ordering::Greater),
-                    CameraPropertyValue::EnumValue(_) => Some(Ordering::Equal),
-                    _ => Some(Ordering::Less),
-                }
-            }
-            CameraPropertyValue::Binary(b) => {
-                match other {
-                    CameraPropertyValue::Null|
-                    CameraPropertyValue::Boolean(_)|
-                    CameraPropertyValue::Integer(_)|
-                    CameraPropertyValue::LongInteger(_)|
-                    CameraPropertyValue::Float(_)|
-                    CameraPropertyValue::Double(_)|
-                    CameraPropertyValue::String(_)|
-                    CameraPropertyValue::Array(_)|
-                    CameraPropertyValue::EnumValue(_) => Some(Ordering::Greater),
-                    CameraPropertyValue::Binary(ob) => {
-                        b.partial_cmp(ob)
-                    }
-                    _ => Some(Ordering::Less),
-                }
-            }
+                CameraPropertyValue::Integer(oth) => Some(long.cmp(&(i128::from(oth)))),
+                CameraPropertyValue::LongInteger(o) => Some(long.cmp(o)),
+                _ => Some(Ordering::Less),
+            },
+            CameraPropertyValue::Float(fl) => match other {
+                CameraPropertyValue::Null
+                | CameraPropertyValue::Boolean(_)
+                | CameraPropertyValue::Integer(_)
+                | CameraPropertyValue::LongInteger(_) => Some(Ordering::Greater),
+                CameraPropertyValue::Float(f) => fl.partial_cmp(f),
+                CameraPropertyValue::Double(d) => f64::from(fl).partial_cmp(d),
+                _ => Some(Ordering::Less),
+            },
+            CameraPropertyValue::Double(d) => match other {
+                CameraPropertyValue::Null
+                | CameraPropertyValue::Boolean(_)
+                | CameraPropertyValue::Integer(_)
+                | CameraPropertyValue::LongInteger(_) => Some(Ordering::Greater),
+                CameraPropertyValue::Float(f) => d.partial_cmp(&(f64::from(f))),
+                CameraPropertyValue::Double(o) => d.partial_cmp(o),
+                _ => Some(Ordering::Less),
+            },
+            CameraPropertyValue::String(s) => match other {
+                CameraPropertyValue::Null
+                | CameraPropertyValue::Boolean(_)
+                | CameraPropertyValue::Integer(_)
+                | CameraPropertyValue::LongInteger(_)
+                | CameraPropertyValue::Float(_)
+                | CameraPropertyValue::Double(_) => Some(Ordering::Greater),
+                CameraPropertyValue::String(os) => s.partial_cmp(os),
+                _ => Some(Ordering::Less),
+            },
+            CameraPropertyValue::Array(a) => match other {
+                CameraPropertyValue::Null
+                | CameraPropertyValue::Boolean(_)
+                | CameraPropertyValue::Integer(_)
+                | CameraPropertyValue::LongInteger(_)
+                | CameraPropertyValue::Float(_)
+                | CameraPropertyValue::Double(_)
+                | CameraPropertyValue::String(_) => Some(Ordering::Greater),
+                CameraPropertyValue::Array(oa) => a.partial_cmp(oa),
+                _ => Some(Ordering::Less),
+            },
+            CameraPropertyValue::EnumValue(_) => match other {
+                CameraPropertyValue::Null
+                | CameraPropertyValue::Boolean(_)
+                | CameraPropertyValue::Integer(_)
+                | CameraPropertyValue::LongInteger(_)
+                | CameraPropertyValue::Float(_)
+                | CameraPropertyValue::Double(_)
+                | CameraPropertyValue::String(_)
+                | CameraPropertyValue::Array(_) => Some(Ordering::Greater),
+                CameraPropertyValue::EnumValue(_) => Some(Ordering::Equal),
+                _ => Some(Ordering::Less),
+            },
+            CameraPropertyValue::Binary(b) => match other {
+                CameraPropertyValue::Null
+                | CameraPropertyValue::Boolean(_)
+                | CameraPropertyValue::Integer(_)
+                | CameraPropertyValue::LongInteger(_)
+                | CameraPropertyValue::Float(_)
+                | CameraPropertyValue::Double(_)
+                | CameraPropertyValue::String(_)
+                | CameraPropertyValue::Array(_)
+                | CameraPropertyValue::EnumValue(_) => Some(Ordering::Greater),
+                CameraPropertyValue::Binary(ob) => b.partial_cmp(ob),
+                _ => Some(Ordering::Less),
+            },
             // FIXME: implement this lole
             CameraPropertyValue::Pair(_, _) => {
                 // match other {
@@ -655,7 +651,7 @@ macro_rules! define_back_and_fourth_control {
         impl ControlIntermediate {
             pub fn
         }
-        
+
         // impl ControlIntermediate {
         //     pub fn into_control(native_ctrl: $id_type) -> (crate::properties::CameraPropertyId, Option<crate::properties::CameraPropertyFlag>) {
         //         match native_ctrl {

@@ -34,14 +34,14 @@ use nokhwa::{
         frame_formats, yuyv422_predicted_size, CameraFormat, CameraIndex, FrameFormat,
         RequestedFormat, RequestedFormatType, Resolution,
     },
-    Buffer, CallbackCamera, Camera,
+    FrameBuffer, CallbackCamera, Camera,
 };
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
 struct CaptureState {
-    receiver: Arc<Receiver<Buffer>>,
+    receiver: Arc<Receiver<FrameBuffer>>,
     buffer: Vec<u8>,
     format: CameraFormat,
 }

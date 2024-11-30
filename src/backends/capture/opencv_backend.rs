@@ -16,7 +16,7 @@
 
 use nokhwa_core::types::RequestedFormatType;
 use nokhwa_core::{
-    buffer::Buffer,
+    frame_buffer::FrameBuffer,
     error::NokhwaError,
     traits::CaptureTrait,
     types::{
@@ -525,7 +525,7 @@ impl CaptureTrait for OpenCvCaptureDevice {
         self.video_capture.is_opened().unwrap_or(false)
     }
 
-    fn frame(&mut self) -> Result<Buffer, NokhwaError> {
+    fn frame(&mut self) -> Result<FrameBuffer, NokhwaError> {
         let camera_resolution = self.camera_format.resolution();
         let image_data = {
             let mut data = self.frame_raw()?.to_vec();
@@ -535,7 +535,7 @@ impl CaptureTrait for OpenCvCaptureDevice {
             );
             data
         };
-        Ok(Buffer::new(
+        Ok(FrameBuffer::new(
             camera_resolution,
             &image_data,
             self.camera_format.format(),

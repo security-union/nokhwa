@@ -21,7 +21,7 @@ use nokhwa_bindings_macos::{
     AVCaptureVideoDataOutput,
 };
 use nokhwa_core::{
-    buffer::Buffer,
+    frame_buffer::FrameBuffer,
     error::NokhwaError,
     pixel_format::RgbFormat,
     traits::CaptureTrait,
@@ -278,11 +278,11 @@ impl CaptureTrait for AVFoundationCaptureDevice {
         }
     }
 
-    fn frame(&mut self) -> Result<Buffer, NokhwaError> {
+    fn frame(&mut self) -> Result<FrameBuffer, NokhwaError> {
         self.refresh_camera_format()?;
         let cfmt = self.camera_format();
         let b = self.frame_raw()?;
-        let buffer = Buffer::new(cfmt.resolution(), b.as_ref(), cfmt.format());
+        let buffer = FrameBuffer::new(cfmt.resolution(), b.as_ref(), cfmt.format());
         let _ = self.frame_buffer_receiver.drain();
         Ok(buffer)
     }
@@ -476,7 +476,7 @@ impl CaptureTrait for AVFoundationCaptureDevice {
         todo!()
     }
 
-    fn frame(&mut self) -> Result<Buffer, NokhwaError> {
+    fn frame(&mut self) -> Result<FrameBuffer, NokhwaError> {
         todo!()
     }
 

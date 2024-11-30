@@ -1,18 +1,18 @@
-use crate::{
-    error::NokhwaError,
-    frame_format::FrameFormat,
-};
+use crate::utils::Distance;
+use crate::{error::NokhwaError, frame_format::FrameFormat};
 #[cfg(feature = "serialize")]
 use serde::{Deserialize, Serialize};
 use std::{
-    borrow::Borrow, cmp::Ordering, fmt::{
-        Debug,
-        Display,
-        Formatter
-    }, hash::{Hash, Hasher}, ops::{Add, Deref, DerefMut, Sub}
+    borrow::Borrow,
+    cmp::Ordering,
+    fmt::{Debug, Display, Formatter},
+    hash::{Hash},
+    ops::{Sub},
 };
-use crate::traits::Distance;
-
+use std::num::NonZeroI32;
+use std::ops::{Div, Rem};
+use num_rational::Rational32;
+use crate::ranges::{SimpleRangeItem};
 
 /// Describes the index of the camera.
 /// - Index: A numbered index
@@ -105,7 +105,7 @@ pub struct Resolution {
 impl Resolution {
     /// Create a new resolution from 2 image size coordinates.
     #[must_use]
-    pub fn new(x: u32, y: u32) -> Self {
+    pub const fn new(x: u32, y: u32) -> Self {
         Resolution {
             width_x: x,
             height_y: y,
@@ -180,77 +180,122 @@ impl Distance<u32> for Resolution {
     }
 }
 
-#[derive(Copy, Clone, Debug, Hash)]
+impl Div for Resolution {
+    type Output = Resolution;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        let x_div = self.x().div(rhs.x());
+        let y_div = self.y().div(rhs.y());
+        Resolution::new(x_div, y_div)
+    }
+}
+
+impl Sub for Resolution {
+    type Output = Resolution;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        let x_sub = self.x().sub(rhs.x());
+        let y_sub = self.y().sub(rhs.y());
+        Resolution::new(x_sub, y_sub)
+    }
+}
+
+impl Rem for Resolution {
+    type Output = Resolution;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        let x_rem = self.x().rem(rhs.x());
+        let y_rem = self.y().rem(rhs.y());
+        Resolution::new(x_rem, y_rem)
+    }
+}
+
+impl SimpleRangeItem for Resolution {
+    const ZERO: Self = Resolution::new(0, 0);
+}
+
+/// Framerate of a camera, backed by a num-rational Ratio type.
+///
+/// Note that while constructing negative is allowed, the absolute value
+/// will be passed to the driver.
+///
+/// # Panics
+/// If denominator is 0, any attempt to use the [`FrameRate`] will **panic.**
+#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct FrameRate {
-    numerator: u32,
-    denominator: u32
+    rational: Rational32,
 }
 
 impl FrameRate {
-    pub fn new(numerator: u32, denominator: u32) -> Self {
+    pub const fn new(numerator: i32, denominator: NonZeroI32) -> Self {
         Self {
-            numerator,
-            denominator,
+            rational: Rational32::new_raw(numerator, denominator.get()),
         }
     }
 
-    pub fn frame_rate(fps: u32) -> Self {
+    pub const fn frame_rate(fps: i32) -> Self {
         Self {
-            numerator: fps,
-            denominator: 1,
+            rational: Rational32::new_raw(fps, 1),
         }
     }
 
-    pub fn numerator(&self) -> u32 {
-        self.numerator
+    pub fn numerator(&self) -> &i32 {
+        self.rational.numer()
     }
 
-    pub fn denominator(&self) -> u32 {
-        self.denominator
+    pub fn denominator(&self) -> &i32 {
+        self.rational.denom()
     }
-
 }
 
 impl Default for FrameRate {
     fn default() -> Self {
-        FrameRate::new(30, 1)
+        FrameRate::new(30, NonZeroI32::new(1).unwrap())
     }
 }
 
 impl Display for FrameRate {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}/{} FPS", self.numerator, self.denominator)
+        write!(f, "{}/{} FPS", self.numerator(), self.denominator())
     }
 }
 
-impl Eq for FrameRate {}
+impl Div for FrameRate {
+    type Output = FrameRate;
 
-impl PartialEq<Self> for FrameRate {
-    fn eq(&self, other: &Self) -> bool {
-        (self.numerator * other.denominator) == (other.numerator * self.numerator)
+    fn div(self, rhs: Self) -> Self::Output {
+        self.rational.div(rhs.rational).into()
     }
 }
 
-impl PartialOrd<Self> for FrameRate {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+impl Sub for FrameRate {
+    type Output = FrameRate;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self.rational.sub(rhs.rational).into()
     }
 }
 
-impl Ord for FrameRate {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.numerator == 0 && other.denominator == 0 {
-            return Ordering::Equal;
+impl Rem for FrameRate {
+    type Output = FrameRate;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        self.rational.rem(rhs.rational).into()
+    }
+}
+
+impl SimpleRangeItem for FrameRate {
+    const ZERO: Self = FrameRate::frame_rate(0);
+}
+
+impl From<Rational32> for FrameRate {
+    fn from(value: Rational32) -> Self {
+        FrameRate {
+            rational: value,
         }
-        
-        if self.denominator == other.denominator {
-            return self.numerator.cmp(&other.numerator);
-        }
-
-        (self.numerator * other.denominator).cmp(&(other.numerator * self.denominator))
     }
 }
-
 
 /// This is a convenience struct that holds all information about the format of a webcam stream.
 /// It consists of a [`Resolution`], [`FrameFormat`], and a [`FrameRate`].
@@ -265,7 +310,7 @@ pub struct CameraFormat {
 impl CameraFormat {
     /// Construct a new [`CameraFormat`]
     #[must_use]
-    pub fn new(resolution: Resolution, format: FrameFormat, frame_rate: FrameRate) -> Self {
+    pub const fn new(resolution: Resolution, format: FrameFormat, frame_rate: FrameRate) -> Self {
         CameraFormat {
             resolution,
             format,
@@ -275,7 +320,7 @@ impl CameraFormat {
 
     /// [`CameraFormat::new()`], but raw.
     #[must_use]
-    pub fn new_from(res_x: u32, res_y: u32, format: FrameFormat, fps: FrameRate) -> Self {
+    pub const fn new_from(res_x: u32, res_y: u32, format: FrameFormat, fps: FrameRate) -> Self {
         CameraFormat {
             resolution: Resolution {
                 width_x: res_x,
@@ -529,375 +574,4 @@ impl Display for ApiBackend {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self:?}")
     }
-}
-
-// /// A webcam index that supports both strings and integers. Most backends take an int, but `IPCamera`s take a URL (string).
-// #[derive(Clone, Debug, Hash, PartialEq, PartialOrd)]
-// pub enum CameraIndex {
-//     Index(u32),
-//     String(String),
-// }
-
-// impl CameraIndex {
-//     /// Gets the device info's index as an `u32`.
-//     /// # Errors
-//     /// If the index is not parsable as a `u32`, this will error.
-//     pub fn as_index(&self) -> Result<u32, NokhwaError> {
-//         match self {
-//             CameraIndex::Index(i) => Ok(*i),
-//             CameraIndex::String(s) => match s.parse::<u32>() {
-//                 Ok(p) => Ok(p),
-//                 Err(why) => Err(NokhwaError::GetPropertyError {
-//                     property: "index-int".to_string(),
-//                     error: why.to_string(),
-//                 }),
-//             },
-//         }
-//     }
-// }
-
-// impl Display for CameraIndex {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             CameraIndex::Index(idx) => {
-//                 write!(f, "{}", idx)
-//             }
-//             CameraIndex::String(ip) => {
-//                 write!(f, "{}", ip)
-//             }
-//         }
-//     }
-// }
-
-// impl From<u32> for CameraIndex {
-//     fn from(v: u32) -> Self {
-//         CameraIndex::Index(v)
-//     }
-// }
-
-// /// Trait for strings that can be converted to [`CameraIndex`]es.
-// pub trait ValidString: AsRef<str> {}
-//
-// impl ValidString for String {}
-// impl<'a> ValidString for &'a String {}
-// impl<'a> ValidString for &'a mut String {}
-// impl<'a> ValidString for Cow<'a, str> {}
-// impl<'a> ValidString for &'a Cow<'a, str> {}
-// impl<'a> ValidString for &'a mut Cow<'a, str> {}
-// impl<'a> ValidString for &'a str {}
-// impl<'a> ValidString for &'a mut str {}
-
-// impl<T> From<T> for CameraIndex
-// where
-//     T: ValidString,
-// {
-//     fn from(v: T) -> Self {
-//         CameraIndex::String(v.as_ref().to_string())
-//     }
-// }
-
-#[cfg(all(feature = "conversions", not(target_arch = "wasm32")))]
-#[cfg_attr(feature = "docs-features", doc(cfg(feature = "mjpeg")))]
-#[inline]
-fn decompress<'a>(
-    data: &'a [u8],
-    rgba: bool,
-) -> Result<mozjpeg::decompress::DecompressStarted<'a>, NokhwaError> {
-    use mozjpeg::Decompress;
-
-    match Decompress::new_mem(data) {
-        Ok(decompress) => {
-            let decompressor_res = if rgba {
-                decompress.rgba()
-            } else {
-                decompress.rgb()
-            };
-            match decompressor_res {
-                Ok(decompressor) => Ok(decompressor),
-                Err(why) => {
-                    return Err(NokhwaError::ProcessFrameError {
-                        src: FrameFormat::MJpeg,
-                        destination: "RGB888".to_string(),
-                        error: why.to_string(),
-                    })
-                }
-            }
-        }
-        Err(why) => {
-            return Err(NokhwaError::ProcessFrameError {
-                src: FrameFormat::MJpeg,
-                destination: "RGB888".to_string(),
-                error: why.to_string(),
-            })
-        }
-    }
-}
-
-/// Converts a MJpeg stream of `&[u8]` into a `Vec<u8>` of RGB888. (R,G,B,R,G,B,...)
-/// # Errors
-/// If `mozjpeg` fails to read scanlines or setup the decompressor, this will error.
-/// # Safety
-/// This function uses `unsafe`. The caller must ensure that:
-/// - The input data is of the right size, does not exceed bounds, and/or the final size matches with the initial size.
-#[cfg(all(feature = "conversions", not(target_arch = "wasm32")))]
-#[cfg_attr(feature = "docs-features", doc(cfg(feature = "mjpeg")))]
-#[inline]
-pub fn mjpeg_to_rgb(data: &[u8], rgba: bool) -> Result<Vec<u8>, NokhwaError> {
-    let mut jpeg_decompress = decompress(data, rgba)?;
-
-    let scanlines_res: Option<Vec<u8>> = jpeg_decompress.read_scanlines_flat();
-    // assert!(jpeg_decompress.finish_decompress());
-    if !jpeg_decompress.finish_decompress() {
-        return Err(NokhwaError::ProcessFrameError {
-            src: FrameFormat::MJpeg,
-            destination: "RGB888".to_string(),
-            error: "JPEG Decompressor did not finish.".to_string(),
-        });
-    }
-
-    match scanlines_res {
-        Some(pixels) => Ok(pixels),
-        None => Err(NokhwaError::ProcessFrameError {
-            src: FrameFormat::MJpeg,
-            destination: "RGB888".to_string(),
-            error: "Failed to get read readlines into RGB888 pixels!".to_string(),
-        }),
-    }
-}
-
-
-/// Equivalent to [`mjpeg_to_rgb`] except with a destination buffer.
-/// # Errors
-/// If the decoding fails (e.g. invalid MJpeg stream), the buffer is not large enough, or you are doing this on `WebAssembly`, this will error.
-#[cfg(not(all(feature = "conversions", not(target_arch = "wasm32"))))]
-pub fn mjpeg_to_rgb(_data: &[u8], _rgba: bool) -> Result<Vec<u8>, NokhwaError> {
-    Err(NokhwaError::NotImplementedError(
-        "Not available on WASM".to_string(),
-    ))
-}
-
-/// Equivalent to [`mjpeg_to_rgb`] except with a destination buffer.
-/// # Errors
-/// If the decoding fails (e.g. invalid MJpeg stream), the buffer is not large enough, or you are doing this on `WebAssembly`, this will error.
-#[cfg(not(all(feature = "conversions", not(target_arch = "wasm32"))))]
-#[cfg_attr(feature = "docs-features", doc(cfg(feature = "mjpeg")))]
-#[inline]
-pub fn buf_mjpeg_to_rgb(data: &[u8], dest: &mut [u8], rgba: bool) -> Result<(), NokhwaError> {
-    let mut jpeg_decompress = mozjpeg::decompress(data, rgba)?;
-
-    // assert_eq!(dest.len(), jpeg_decompress.min_flat_buffer_size());
-    if dest.len() != jpeg_decompress.min_flat_buffer_size() {
-        return Err(NokhwaError::ProcessFrameError {
-            src: FrameFormat::MJpeg,
-            destination: "RGB888".to_string(),
-            error: "Bad decoded buffer size".to_string(),
-        });
-    }
-
-    jpeg_decompress.read_scanlines_flat_into(dest);
-    // assert!(jpeg_decompress.finish_decompress());
-    if !jpeg_decompress.finish_decompress() {
-        return Err(NokhwaError::ProcessFrameError {
-            src: FrameFormat::MJpeg,
-            destination: "RGB888".to_string(),
-            error: "JPEG Decompressor did not finish.".to_string(),
-        });
-    }
-    Ok(())
-}
-
-// TODO: deprecate?
-/// Equivalent to [`mjpeg_to_rgb`] except with a destination buffer.
-/// # Errors
-/// If the decoding fails (e.g. invalid MJpeg stream), the buffer is not large enough, or you are doing this on `WebAssembly`, this will error.
-#[cfg(all(feature = "conversions", not(target_arch = "wasm32")))]
-pub fn buf_mjpeg_to_rgb(_data: &[u8], _dest: &mut [u8], _rgba: bool) -> Result<(), NokhwaError> {
-    Err(NokhwaError::NotImplementedError(
-        "Not available on WASM".to_string(),
-    ))
-}
-
-/// Returns the predicted size of the destination Yuv422422 buffer.
-#[inline]
-pub fn yuyv422_predicted_size(size: usize, rgba: bool) -> usize {
-    let pixel_size = if rgba { 4 } else { 3 };
-    // yuyv yields 2 3-byte pixels per yuyv chunk
-    (size / 4) * (2 * pixel_size)
-}
-
-#[inline]
-pub fn yuyv422_to_rgb(data: &[u8], rgba: bool) -> Result<Vec<u8>, NokhwaError> {
-    let capacity = yuyv422_predicted_size(data.len(), rgba);
-    let mut rgb = vec![0; capacity];
-    buf_yuyv422_to_rgb(data, &mut rgb, rgba)?;
-    Ok(rgb)
-}
-
-/// Same as [`yuyv422_to_rgb`] but with a destination buffer instead of a return `Vec<u8>`
-/// # Errors
-/// If the stream is invalid Yuv422, or the destination buffer is not large enough, this will error.
-#[inline]
-pub fn buf_yuyv422_to_rgb(data: &[u8], dest: &mut [u8], rgba: bool) -> Result<(), NokhwaError> {
-    let mut buf: Vec<u8> = Vec::new();
-    if data.len() % 4 != 0 {
-        return Err(NokhwaError::ProcessFrameError {
-            src: FrameFormat::Yuy2_422,
-            destination: "RGB888".to_string(),
-            error: "Assertion failure, the YUV stream isn't 4:2:2! (wrong number of bytes)"
-                .to_string(),
-        });
-    }
-    for chunk in data.chunks_exact(4) {
-        let y0 = f32::from(chunk[0]);
-        let u = f32::from(chunk[1]);
-        let y1 = f32::from(chunk[2]);
-        let v = f32::from(chunk[3]);
-
-        let r0 = y0 + 1.370_705 * (v - 128.);
-        let g0 = y0 - 0.698_001 * (v - 128.) - 0.337_633 * (u - 128.);
-        let b0 = y0 + 1.732_446 * (u - 128.);
-
-        let r1 = y1 + 1.370_705 * (v - 128.);
-        let g1 = y1 - 0.698_001 * (v - 128.) - 0.337_633 * (u - 128.);
-        let b1 = y1 + 1.732_446 * (u - 128.);
-
-        if rgba {
-            buf.extend_from_slice(&[
-                r0 as u8, g0 as u8, b0 as u8, 255, r1 as u8, g1 as u8, b1 as u8, 255,
-            ]);
-        } else {
-            buf.extend_from_slice(&[r0 as u8, g0 as u8, b0 as u8, r1 as u8, g1 as u8, b1 as u8]);
-        }
-    }
-    dest.copy_from_slice(&buf);
-    Ok(())
-}
-
-// equation from https://en.wikipedia.org/wiki/YUV#Converting_between_Y%E2%80%B2UV_and_RGB
-/// Convert `YCbCr` 4:4:4 to a RGB888. [For further reading](https://en.wikipedia.org/wiki/YUV#Converting_between_Y%E2%80%B2UV_and_RGB)
-#[allow(clippy::many_single_char_names)]
-#[allow(clippy::cast_possible_truncation)]
-#[allow(clippy::cast_sign_loss)]
-#[must_use]
-#[inline]
-pub fn yuyv444_to_rgb(y: i32, u: i32, v: i32) -> [u8; 3] {
-    let c298 = (y - 16) * 298;
-    let d = u - 128;
-    let e = v - 128;
-    let r = ((c298 + 409 * e + 128) >> 8).clamp(0, 255) as u8;
-    let g = ((c298 - 100 * d - 208 * e + 128) >> 8).clamp(0, 255) as u8;
-    let b = ((c298 + 516 * d + 128) >> 8).clamp(0, 255) as u8;
-    [r, g, b]
-}
-
-// equation from https://en.wikipedia.org/wiki/YUV#Converting_between_Y%E2%80%B2UV_and_RGB
-/// Convert `YCbCr` 4:4:4 to a RGBA8888. [For further reading](https://en.wikipedia.org/wiki/YUV#Converting_between_Y%E2%80%B2UV_and_RGB)
-///
-/// Equivalent to [`yuyv444_to_rgb`] but with an alpha channel attached.
-#[allow(clippy::many_single_char_names)]
-#[must_use]
-#[inline]
-pub fn yuyv444_to_rgba(y: i32, u: i32, v: i32) -> [u8; 4] {
-    let [r, g, b] = yuyv444_to_rgb(y, u, v);
-    [r, g, b, 255]
-}
-
-/// Converts a Yuv422 4:2:0 bi-planar (NV12) datastream to a RGB888 Stream. [For further reading](https://en.wikipedia.org/wiki/YUV#Converting_between_Y%E2%80%B2UV_and_RGB)
-/// # Errors
-/// This may error when the data stream size is wrong.
-#[inline]
-pub fn nv12_to_rgb(
-    resolution: Resolution,
-    data: &[u8],
-    rgba: bool,
-) -> Result<Vec<u8>, NokhwaError> {
-    let pxsize = if rgba { 4 } else { 3 };
-    let mut dest = vec![0; (pxsize * resolution.width() * resolution.height()) as usize];
-    buf_nv12_to_rgb(resolution, data, &mut dest, rgba)?;
-    Ok(dest)
-}
-
-// this depresses me
-// like, everytime i open this codebase all the life is sucked out of me
-// i hate it
-/// Converts a Yuv422 4:2:0 bi-planar (NV12) datastream to a RGB888 Stream and outputs it into a destination buffer. [For further reading](https://en.wikipedia.org/wiki/YUV#Converting_between_Y%E2%80%B2UV_and_RGB)
-/// # Errors
-/// This may error when the data stream size is wrong.
-#[allow(clippy::similar_names)]
-#[inline]
-pub fn buf_nv12_to_rgb(
-    resolution: Resolution,
-    data: &[u8],
-    out: &mut [u8],
-    rgba: bool,
-) -> Result<(), NokhwaError> {
-    if resolution.width() % 2 != 0 || resolution.height() % 2 != 0 {
-        return Err(NokhwaError::ProcessFrameError {
-            src: FrameFormat::Nv12,
-            destination: "RGB".to_string(),
-            error: "bad resolution".to_string(),
-        });
-    }
-
-    if data.len() != ((resolution.width() * resolution.height() * 3) / 2) as usize {
-        return Err(NokhwaError::ProcessFrameError {
-            src: FrameFormat::Nv12,
-            destination: "RGB".to_string(),
-            error: "bad input buffer size".to_string(),
-        });
-    }
-
-    let pxsize = if rgba { 4 } else { 3 };
-
-    if out.len() != (pxsize * resolution.width() * resolution.height()) as usize {
-        return Err(NokhwaError::ProcessFrameError {
-            src: FrameFormat::Nv12,
-            destination: "RGB".to_string(),
-            error: "bad output buffer size".to_string(),
-        });
-    }
-
-    let rgba_size = if rgba { 4 } else { 3 };
-
-    let y_section = (resolution.width() * resolution.height()) as usize;
-
-    let width_usize = resolution.width() as usize;
-    // let height_usize = resolution.height() as usize;
-
-    for (hidx, horizontal_row) in data[0..y_section].chunks_exact(width_usize).enumerate() {
-        for (cidx, column) in horizontal_row.chunks_exact(2).enumerate() {
-            let u = data[(y_section) + ((hidx / 2) * width_usize) + (cidx * 2)];
-            let v = data[(y_section) + ((hidx / 2) * width_usize) + (cidx * 2) + 1];
-
-            let y0 = column[0];
-            let y1 = column[1];
-            let base_index = (hidx * width_usize * rgba_size) + cidx * rgba_size * 2;
-
-            if rgba {
-                let px0 = yuyv444_to_rgba(y0 as i32, u as i32, v as i32);
-                let px1 = yuyv444_to_rgba(y1 as i32, u as i32, v as i32);
-
-                out[base_index] = px0[0];
-                out[base_index + 1] = px0[1];
-                out[base_index + 2] = px0[2];
-                out[base_index + 3] = px0[3];
-                out[base_index + 4] = px1[0];
-                out[base_index + 5] = px1[1];
-                out[base_index + 6] = px1[2];
-                out[base_index + 7] = px1[3];
-            } else {
-                let px0 = yuyv444_to_rgb(y0 as i32, u as i32, v as i32);
-                let px1 = yuyv444_to_rgb(y1 as i32, u as i32, v as i32);
-
-                out[base_index] = px0[0];
-                out[base_index + 1] = px0[1];
-                out[base_index + 2] = px0[2];
-                out[base_index + 3] = px1[0];
-                out[base_index + 4] = px1[1];
-                out[base_index + 5] = px1[2];
-            }
-        }
-    }
-
-    Ok(())
 }

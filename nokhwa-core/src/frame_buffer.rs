@@ -14,22 +14,22 @@
  * limitations under the License.
  */
 
+use crate::frame_format::FrameFormat;
 use crate::types::Resolution;
 use bytes::Bytes;
-use crate::frame_format::FrameFormat;
 
 /// A buffer returned by a camera to accommodate custom decoding.
 /// Contains information of Resolution, the buffer's [`FrameFormat`], and the buffer.
 ///
 /// Note that decoding on the main thread **will** decrease your performance and lead to dropped frames.
 #[derive(Clone, Debug, Hash, PartialOrd, PartialEq, Eq)]
-pub struct Buffer {
+pub struct FrameBuffer {
     resolution: Resolution,
     buffer: Bytes,
     source_frame_format: FrameFormat,
 }
 
-impl Buffer {
+impl FrameBuffer {
     /// Creates a new buffer with a [`&[u8]`].
     #[must_use]
     #[inline]
@@ -53,7 +53,7 @@ impl Buffer {
         &self.buffer
     }
 
-    /// Get an owned version of this buffer. Note: This is the equivalent 
+    /// Get an owned version of this buffer. Note: This is the equivalent
     #[must_use]
     pub fn buffer_bytes(&self) -> Bytes {
         self.buffer.clone()

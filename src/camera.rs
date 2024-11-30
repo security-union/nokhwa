@@ -18,7 +18,7 @@ use nokhwa_core::format_request::FormatFilter;
 use nokhwa_core::frame_format::SourceFrameFormat;
 use nokhwa_core::traits::Backend;
 use nokhwa_core::{
-    buffer::Buffer,
+    frame_buffer::FrameBuffer,
     error::NokhwaError,
     pixel_format::FormatDecoder,
     traits::CaptureTrait,
@@ -136,7 +136,7 @@ impl CaptureTrait for Camera {
         todo!()
     }
 
-    fn frame(&mut self) -> Result<Buffer, NokhwaError> {
+    fn frame(&mut self) -> Result<FrameBuffer, NokhwaError> {
         todo!()
     }
 
