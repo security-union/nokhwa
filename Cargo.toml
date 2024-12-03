@@ -19,7 +19,7 @@ exclude = ["examples/jscam"]
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["flume", "decoding"]
+default = ["decoding"]
 serialize = ["serde", "nokhwa-core/serialize"]
 decoding = ["nokhwa-core/mjpeg"]
 input-avfoundation = ["nokhwa-bindings-macos"]
@@ -48,6 +48,7 @@ test-fail-warning = []
 [dependencies]
 thiserror = "1.0"
 paste = "1.0"
+flume = "0.11"
 
 [dependencies.nokhwa-core]
 version = "0.1"
@@ -55,10 +56,6 @@ path = "nokhwa-core"
 
 [dependencies.serde]
 version = "1.0"
-optional = true
-
-[dependencies.flume]
-version = "0.11"
 optional = true
 
 [dependencies.image]

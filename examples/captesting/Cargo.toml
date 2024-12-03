@@ -1,0 +1,14 @@
+[package]
+name = "captesting"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[dependencies.image]
+version = "0.25"
+
+[dependencies.nokhwa]
+path = "../.."
+# EDIT THIS!
+features = ["input-native"]
