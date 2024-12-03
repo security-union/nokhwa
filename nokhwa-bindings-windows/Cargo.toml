@@ -1,6 +1,6 @@
 [package]
 name = "nokhwa-bindings-windows"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["l1npengtul"]
 edition = "2021"
 license = "Apache-2.0"
@@ -9,6 +9,9 @@ description = "The Windows Media Foundation bindings crate for `nokhwa`"
 keywords = ["media-foundation", "windows", "capture", "webcam"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+docs-only = []
 
 [dependencies]
 
@@ -22,3 +25,6 @@ features = ["Win32_Media_MediaFoundation", "Win32_System_Com", "Win32_Foundation
 
 [target.'cfg(target_os="windows")'.dependencies.once_cell]
 version = "1.16"
+
+[package.metadata.docs.rs]
+features = ["docs-only"]
