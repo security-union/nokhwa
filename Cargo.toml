@@ -67,7 +67,7 @@ version = "0.2"
 optional = true
 
 [dependencies.wgpu]
-version = "22"
+version = "23"
 optional = true
 
 [dependencies.opencv]
