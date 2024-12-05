@@ -7,7 +7,7 @@ use serde::{de, Serialize};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{window, MediaDeviceInfo, MediaDevices, MediaStream, MediaStreamConstraints, MediaStreamTrack, MediaTrackConstraints, Navigator};
 use nokhwa_core::frame_buffer::FrameBuffer;
-use nokhwa_core::properties::{CameraControl, ControlValueSetter, KnownCameraControl};
+use nokhwa_core::properties::{CameraControl, ControlValue, KnownCameraControl};
 use nokhwa_core::error::NokhwaError;
 use nokhwa_core::frame_format::FrameFormat;
 use nokhwa_core::traits::{AsyncCaptureTrait, AsyncOpenCaptureTrait, CaptureTrait, OpenCaptureTrait};
@@ -360,7 +360,7 @@ impl CaptureTrait for BrowserCaptureDevice {
     fn set_camera_control(
         &mut self,
         id: KnownCameraControl,
-        value: ControlValueSetter,
+        value: ControlValue,
     ) -> Result<(), NokhwaError> {
         todo!()
     }
@@ -414,7 +414,7 @@ impl AsyncCaptureTrait for BrowserCaptureDevice {
         todo!()
     }
 
-    async fn set_camera_control_async(&mut self, id: KnownCameraControl, value: ControlValueSetter) -> Result<(), NokhwaError> {
+    async fn set_camera_control_async(&mut self, id: KnownCameraControl, value: ControlValue) -> Result<(), NokhwaError> {
         todo!()
     }
 

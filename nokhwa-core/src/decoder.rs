@@ -1,8 +1,6 @@
 use crate::{error::NokhwaError, frame_buffer::FrameBuffer, frame_format::FrameFormat};
 use image::{ImageBuffer, Pixel};
 use std::{
-    error::Error,
-    fmt::{Debug, Display},
     ops::{ControlFlow, Deref},
 };
 

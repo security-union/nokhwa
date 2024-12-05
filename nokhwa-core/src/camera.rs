@@ -1,5 +1,4 @@
 use crate::error::{NokhwaError, NokhwaResult};
-use crate::frame_buffer::FrameBuffer;
 use crate::frame_format::FrameFormat;
 use crate::properties::{CameraProperties, CameraPropertyId, CameraPropertyValue};
 use crate::types::{CameraFormat, CameraIndex, FrameRate, Resolution};

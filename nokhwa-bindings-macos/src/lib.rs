@@ -246,7 +246,7 @@ mod internal {
         ffi::{c_float, c_void, CStr},
         sync::Arc,
     };
-    use nokhwa_core::properties::{CameraControl, ControlValueDescription, ControlValueSetter, KnownCameraControl};
+    use nokhwa_core::properties::{CameraControl, ControlValueDescription, ControlValue, KnownCameraControl};
 
     const UTF8_ENCODING: usize = 4;
     type CGFloat = c_float;
@@ -1492,7 +1492,7 @@ mod internal {
         pub fn set_control(
             &mut self,
             id: KnownCameraControl,
-            value: ControlValueSetter,
+            value: ControlValue,
         ) -> Result<(), NokhwaError> {
             let rc = self.get_controls()?;
             let controls = rc

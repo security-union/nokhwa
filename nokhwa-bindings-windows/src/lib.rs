@@ -46,7 +46,7 @@ pub mod wmf {
             Arc,
         },
     };
-    use nokhwa_core::properties::{CameraControl, ControlValueDescription, ControlValueSetter, KnownCameraControl};
+    use nokhwa_core::properties::{CameraControl, ControlValueDescription, ControlValue, KnownCameraControl};
     use windows::Win32::Media::DirectShow::{CameraControl_Flags_Auto, CameraControl_Flags_Manual};
     use windows::Win32::Media::MediaFoundation::{
         IMFMediaType, MFCreateSample, MF_SOURCE_READER_FIRST_VIDEO_STREAM,
@@ -849,7 +849,7 @@ pub mod wmf {
         pub fn set_control(
             &mut self,
             control: KnownCameraControl,
-            value: ControlValueSetter,
+            value: ControlValue,
         ) -> Result<(), NokhwaError> {
             let current_value = self.control(control)?;
 
@@ -897,8 +897,8 @@ pub mod wmf {
             })?;
 
             let ctrl_value = match value {
-                ControlValueSetter::Integer(i) => i as i32,
-                ControlValueSetter::Boolean(b) => i32::from(b),
+                ControlValue::Integer(i) => i as i32,
+                ControlValue::Boolean(b) => i32::from(b),
                 v => {
                     return Err(NokhwaError::StructureError {
                         structure: format!("ControlValueSetter {}", v),
@@ -1229,7 +1229,7 @@ pub mod wmf {
         CameraFormat, CameraIndex, CameraInfo,
     };
     use std::borrow::Cow;
-    use nokhwa_core::properties::{CameraControl, ControlValueSetter, KnownCameraControl};
+    use nokhwa_core::properties::{CameraControl, ControlValue, KnownCameraControl};
 
     pub fn initialize_mf() -> Result<(), NokhwaError> {
         Err(NokhwaError::NotImplementedError(
@@ -1287,7 +1287,7 @@ pub mod wmf {
         pub fn set_control(
             &mut self,
             _control: KnownCameraControl,
-            _value: ControlValueSetter,
+            _value: ControlValue,
         ) -> Result<(), NokhwaError> {
             Err(NokhwaError::NotImplementedError(
                 "Only on Windows".to_string(),

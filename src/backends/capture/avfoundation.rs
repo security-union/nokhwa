@@ -34,7 +34,7 @@ use nokhwa_core::{
 use std::{ffi::CString, sync::Arc};
 
 use std::{borrow::Cow, collections::HashMap};
-use nokhwa_core::properties::{CameraControl, ControlValueSetter, KnownCameraControl};
+use nokhwa_core::properties::{CameraControl, ControlValue, KnownCameraControl};
 
 /// The backend struct that interfaces with V4L2.
 /// To see what this does, please see [`CaptureTrait`].
@@ -231,7 +231,7 @@ impl CaptureTrait for AVFoundationCaptureDevice {
     fn set_camera_control(
         &mut self,
         id: KnownCameraControl,
-        value: ControlValueSetter,
+        value: ControlValue,
     ) -> Result<(), NokhwaError> {
         self.device.lock()?;
         let res = self.device.set_control(id, value);
@@ -463,7 +463,7 @@ impl CaptureTrait for AVFoundationCaptureDevice {
     fn set_camera_control(
         &mut self,
         _: KnownCameraControl,
-        _: ControlValueSetter,
+        _: ControlValue,
     ) -> Result<(), NokhwaError> {
         todo!()
     }

@@ -13,6 +13,7 @@ use std::num::NonZeroI32;
 use std::ops::{Div, Rem};
 use num_rational::Rational32;
 use crate::ranges::{SimpleRangeItem};
+use num_traits::FromPrimitive;
 
 /// Describes the index of the camera.
 /// - Index: A numbered index
@@ -247,6 +248,17 @@ impl FrameRate {
     pub fn denominator(&self) -> &i32 {
         self.rational.denom()
     }
+
+    pub fn as_raw(&self) -> &Rational32 {
+        &self.rational
+    }
+
+    pub fn approximate_float(&self) -> Option<f32> {
+        let numerator_float = f32::from_i32(*self.numerator())?;
+        let denominator_float = f32::from_i32(*self.denominator())?;
+        
+        Some(numerator_float / denominator_float)
+    }
 }
 
 impl Default for FrameRate {
@@ -299,7 +311,7 @@ impl From<Rational32> for FrameRate {
 
 /// This is a convenience struct that holds all information about the format of a webcam stream.
 /// It consists of a [`Resolution`], [`FrameFormat`], and a [`FrameRate`].
-#[derive(Copy, Clone, Debug, Hash, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, PartialOrd, Eq, Ord)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct CameraFormat {
     resolution: Resolution,

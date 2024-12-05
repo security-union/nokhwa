@@ -26,7 +26,7 @@ use nokhwa_core::{
     },
 };
 use std::{borrow::Cow, collections::HashMap};
-use nokhwa_core::properties::{all_known_camera_controls, CameraControl, ControlValueSetter, KnownCameraControl};
+use nokhwa_core::properties::{all_known_camera_controls, CameraControl, ControlValue, KnownCameraControl};
 
 /// The backend that deals with Media Foundation on Windows.
 /// To see what this does, please see [`CaptureTrait`].
@@ -229,7 +229,7 @@ impl CaptureTrait for MediaFoundationCaptureDevice {
     fn set_camera_control(
         &mut self,
         id: KnownCameraControl,
-        value: ControlValueSetter,
+        value: ControlValue,
     ) -> Result<(), NokhwaError> {
         self.inner.set_control(id, value)
     }

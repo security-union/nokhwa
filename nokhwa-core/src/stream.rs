@@ -1,7 +1,6 @@
 use crate::error::{NokhwaError, NokhwaResult};
 use crate::frame_buffer::FrameBuffer;
 use flume::Receiver;
-use futures::TryFutureExt;
 use std::sync::Arc;
 
 pub trait StreamInnerTrait {
@@ -61,6 +60,8 @@ impl Stream {
 
     #[cfg(feature = "async")]
     pub async fn await_frame(&self) -> NokhwaResult<FrameBuffer> {
+        use futures::TryFutureExt;
+
         if self.inner.receiver().is_disconnected() {
             return Err(NokhwaError::ReadFrameError(
                 "stream is disconnected!".to_string(),

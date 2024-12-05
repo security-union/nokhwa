@@ -28,7 +28,7 @@ use nokhwa_core::{
     },
 };
 use std::{borrow::Cow, collections::HashMap};
-use nokhwa_core::properties::{CameraControl, ControlValueSetter, KnownCameraControl};
+use nokhwa_core::properties::{CameraControl, ControlValue, KnownCameraControl};
 
 /// The main `Camera` struct. This is the struct that abstracts over all the backends, providing a simplified interface for use.
 pub struct Camera {
@@ -123,7 +123,7 @@ impl CaptureTrait for Camera {
     fn set_camera_control(
         &mut self,
         id: KnownCameraControl,
-        value: ControlValueSetter,
+        value: ControlValue,
     ) -> Result<(), NokhwaError> {
         todo!()
     }

@@ -33,7 +33,7 @@ use opencv::{
     },
 };
 use std::{borrow::Cow, collections::HashMap};
-use nokhwa_core::properties::{CameraControl, ControlValueDescription, ControlValueSetter, KnownCameraControl};
+use nokhwa_core::properties::{CameraControl, ControlValueDescription, ControlValue, KnownCameraControl};
 
 /// Attempts to convert a [`KnownCameraControl`] into a `OpenCV` video capture property.
 /// If the associated control is not found, this will return `Err`
@@ -434,12 +434,12 @@ impl CaptureTrait for OpenCvCaptureDevice {
     fn set_camera_control(
         &mut self,
         id: KnownCameraControl,
-        value: ControlValueSetter,
+        value: ControlValue,
     ) -> Result<(), NokhwaError> {
         let control_val = match value {
-            ControlValueSetter::Integer(i) => i as f64,
-            ControlValueSetter::Float(f) => f,
-            ControlValueSetter::Boolean(b) => u8::from(b) as f64,
+            ControlValue::Integer(i) => i as f64,
+            ControlValue::Float(f) => f,
+            ControlValue::Boolean(b) => u8::from(b) as f64,
             val => {
                 return Err(NokhwaError::SetPropertyError {
                     property: "Camera Control".to_string(),

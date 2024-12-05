@@ -5,6 +5,7 @@ use crate::{
     types::{CameraFormat, FrameRate, Resolution},
 };
 use std::cmp::Ordering;
+use crate::ranges::ValidatableRange;
 
 #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
 enum ClosestType {
@@ -60,24 +61,29 @@ impl FormatRequest {
                 frame_rate,
                 frame_format,
             } => {
-                let resolution_point = resolution.map(|x| x.preferred())?;
-
-                let frame_rate_point = frame_rate.map(|x| x.preferred())?;
+                let resolution_point = resolution.map(|x| x.preferred());
+                let frame_rate_point = frame_rate.map(|x| x.preferred());
                 // lets calcuate distance in 3 dimensions (add both resolution and frame_rate together)
 
-                let mut distances: Vec<(f32, CameraFormat)> = list_of_formats
+                let mut distances = list_of_formats
                     .iter()
                     .filter(|x| frame_format.contains(&x.format()))
                     .map(|fmt| {
-                        (
-                            (fmt.frame_rate() - frame_rate_point).abs()
-                                + fmt.resolution().distance_from(&resolution_point) as f32,
-                            fmt,
-                        )
+                        let frame_rate_distance = match frame_rate_point {
+                            Some(f_point) => (fmt.frame_rate() - f_point).approximate_float().unwrap_or(f32::INFINITY).abs(),
+                            None => 0_f32,
+                        };
+                        
+                        let resolution_point_distance = match resolution_point {
+                            Some(res_pt) => fmt.resolution().distance_from(&res_pt) as f32,
+                            None => 0_f32,
+                        };
+                        
+                        (frame_rate_distance + resolution_point_distance, fmt)
                     })
-                    .collect::<Vec<_>>();
+                    .collect::<Vec<(f32, &CameraFormat)>>();
                 distances.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
-                distances.into_iter().map(|x| x.1).collect()
+                distances.into_iter().map(|x| x.1).copied().collect()
             }
             FormatRequest::HighestFrameRate {
                 frame_rate,
@@ -86,7 +92,7 @@ impl FormatRequest {
                 let mut formats = list_of_formats
                     .iter()
                     .filter(|x| {
-                        frame_format.contains(&x.format()) && frame_rate.in_range(x.frame_rate())
+                        frame_format.contains(&x.format()) && frame_rate.validate(&x.frame_rate()).is_ok()
                     })
                     .collect::<Vec<_>>();
                 formats.sort();
@@ -99,7 +105,7 @@ impl FormatRequest {
                 let mut formats = list_of_formats
                     .iter()
                     .filter(|x| {
-                        frame_format.contains(&x.format()) && resolution.in_range(x.resolution())
+                        frame_format.contains(&x.format()) && resolution.validate(&x.resolution()).is_ok()
                     })
                     .collect::<Vec<_>>();
                 formats.sort();
