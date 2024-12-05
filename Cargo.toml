@@ -46,7 +46,7 @@ docs-features = []
 test-fail-warning = []
 
 [dependencies]
-thiserror = "1.0"
+thiserror = "2.0"
 paste = "1.0"
 flume = "0.11"
 
