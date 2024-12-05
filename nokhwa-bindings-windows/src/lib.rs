@@ -569,6 +569,7 @@ pub mod wmf {
                 self.source_reader
                     .GetNativeMediaType(MEDIA_FOUNDATION_FIRST_VIDEO_STREAM, index)
             } {
+                index += 1;
                 let fourcc = match unsafe { media_type.GetGUID(&MF_MT_SUBTYPE) } {
                     Ok(fcc) => fcc,
                     Err(why) => {
@@ -593,7 +594,7 @@ pub mod wmf {
                     }
                 };
 
-                // MFRatio is represented as 2 u32s in memory. This means we cann convert it to 2
+                // MFRatio is represented as 2 u32s in memory. This means we can convert it to 2
                 let framerate_list = {
                     let mut framerates = vec![0_u32; 3];
                     if let Ok(fraction_u64) =
@@ -651,8 +652,6 @@ pub mod wmf {
                         ));
                     }
                 }
-
-                index += 1;
             }
             Ok(camera_format_list)
         }
