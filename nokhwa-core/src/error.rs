@@ -16,6 +16,7 @@
 use crate::{frame_format::FrameFormat, types::ApiBackend};
 use std::fmt::{Debug};
 use thiserror::Error;
+use crate::platform::Backends;
 
 pub type NokhwaResult<T> = Result<T, NokhwaError>;
 
@@ -56,9 +57,11 @@ pub enum NokhwaError {
     #[error("Could not stop stream: {0}")]
     StreamShutdownError(String),
     #[error("This operation is not supported by backend {0}.")]
-    UnsupportedOperationError(ApiBackend),
+    UnsupportedOperationError(Backends),
     #[error("This operation is not implemented yet: {0}")]
     NotImplementedError(String),
     #[error("Failed To Convert: {0}")]
     ConversionError(String),
+    #[error("Permission denied by user.")]
+    PermissionDenied,
 }

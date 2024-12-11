@@ -414,23 +414,23 @@ impl Display for CameraFormat {
 /// `index` is a camera's index given to it by (usually) the OS usually in the order it is known to the system.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-pub struct CameraInfo {
+pub struct CameraInformation {
     human_name: String,
     description: String,
     misc: String,
     index: CameraIndex,
 }
 
-impl CameraInfo {
-    /// Create a new [`CameraInfo`].
+impl CameraInformation {
+    /// Create a new [`CameraInformation`].
     /// # JS-WASM
-    /// This is exported as a constructor for [`CameraInfo`].
+    /// This is exported as a constructor for [`CameraInformation`].
     #[must_use]
     // OK, i just checkeed back on this code. WTF was I on when I wrote `&(impl AsRef<str> + ?Sized)` ????
     // I need to get on the same shit that my previous self was on, because holy shit that stuff is strong as FUCK!
     // Finally fixed this insanity. Hopefully I didnt torment anyone by actually putting this in a stable release.
     pub fn new(human_name: String, description: String, misc: String, index: CameraIndex) -> Self {
-        CameraInfo {
+        CameraInformation {
             human_name,
             description,
             misc,
@@ -520,7 +520,7 @@ impl CameraInfo {
     // }
 }
 
-impl Display for CameraInfo {
+impl Display for CameraInformation {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -540,50 +540,50 @@ impl Display for CameraInfo {
 //     Ok(())
 // }
 
-/// The list of known capture backends to the library. <br>
-/// - `Auto` - Use automatic selection.
-/// - `AVFoundation` - Uses `AVFoundation` on `MacOSX`
-/// - `Video4Linux` - `Video4Linux2`, a linux specific backend.
-/// - `UniversalVideoClass` -  ***DEPRECATED*** Universal Video Class (please check [libuvc](https://github.com/libuvc/libuvc)). Platform agnostic, although on linux it needs `sudo` permissions or similar to use.
-/// - `MediaFoundation` - Microsoft Media Foundation, Windows only,
-/// - `OpenCv` - Uses `OpenCV` to capture. Platform agnostic.
-/// - `GStreamer` - ***DEPRECATED*** Uses `GStreamer` RTP to capture. Platform agnostic.
-/// - `Browser` - Uses browser APIs to capture from a webcam.
-pub enum SelectableBackend {
-    Auto,
-    Custom(&'static str),
-    AVFoundation,
-    Video4Linux,
-    UniversalVideoClass,
-    MediaFoundation,
-    OpenCv,
-    GStreamer,
-    Browser,
-}
-
-/// The list of known capture backends to the library. <br>
-/// - `AVFoundation` - Uses `AVFoundation` on `MacOSX`
-/// - `Video4Linux` - `Video4Linux2`, a linux specific backend.
-/// - `UniversalVideoClass` -  ***DEPRECATED*** Universal Video Class (please check [libuvc](https://github.com/libuvc/libuvc)). Platform agnostic, although on linux it needs `sudo` permissions or similar to use.
-/// - `MediaFoundation` - Microsoft Media Foundation, Windows only,
-/// - `OpenCv` - Uses `OpenCV` to capture. Platform agnostic.
-/// - `GStreamer` - ***DEPRECATED*** Uses `GStreamer` RTP to capture. Platform agnostic.
-/// - `Browser` - Uses browser APIs to capture from a webcam.
-#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-pub enum ApiBackend {
-    Custom(&'static str),
-    AVFoundation,
-    Video4Linux,
-    UniversalVideoClass,
-    MediaFoundation,
-    OpenCv,
-    GStreamer,
-    Browser,
-}
-
-impl Display for ApiBackend {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
-    }
-}
+// /// The list of known capture backends to the library. <br>
+// /// - `Auto` - Use automatic selection.
+// /// - `AVFoundation` - Uses `AVFoundation` on `MacOSX`
+// /// - `Video4Linux` - `Video4Linux2`, a linux specific backend.
+// /// - `UniversalVideoClass` -  ***DEPRECATED*** Universal Video Class (please check [libuvc](https://github.com/libuvc/libuvc)). Platform agnostic, although on linux it needs `sudo` permissions or similar to use.
+// /// - `MediaFoundation` - Microsoft Media Foundation, Windows only,
+// /// - `OpenCv` - Uses `OpenCV` to capture. Platform agnostic.
+// /// - `GStreamer` - ***DEPRECATED*** Uses `GStreamer` RTP to capture. Platform agnostic.
+// /// - `Browser` - Uses browser APIs to capture from a webcam.
+// pub enum SelectableBackend {
+//     Auto,
+//     Custom(&'static str),
+//     AVFoundation,
+//     Video4Linux,
+//     UniversalVideoClass,
+//     MediaFoundation,
+//     OpenCv,
+//     GStreamer,
+//     Browser,
+// }
+//
+// /// The list of known capture backends to the library. <br>
+// /// - `AVFoundation` - Uses `AVFoundation` on `MacOSX`
+// /// - `Video4Linux` - `Video4Linux2`, a linux specific backend.
+// /// - `UniversalVideoClass` -  ***DEPRECATED*** Universal Video Class (please check [libuvc](https://github.com/libuvc/libuvc)). Platform agnostic, although on linux it needs `sudo` permissions or similar to use.
+// /// - `MediaFoundation` - Microsoft Media Foundation, Windows only,
+// /// - `OpenCv` - Uses `OpenCV` to capture. Platform agnostic.
+// /// - `GStreamer` - ***DEPRECATED*** Uses `GStreamer` RTP to capture. Platform agnostic.
+// /// - `Browser` - Uses browser APIs to capture from a webcam.
+// #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+// #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+// pub enum ApiBackend {
+//     Custom(&'static str),
+//     AVFoundation,
+//     Video4Linux,
+//     UniversalVideoClass,
+//     MediaFoundation,
+//     OpenCv,
+//     GStreamer,
+//     Browser,
+// }
+//
+// impl Display for ApiBackend {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "{self:?}")
+//     }
+// }

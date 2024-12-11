@@ -11,7 +11,7 @@ use nokhwa_core::properties::{CameraControl, ControlValue, KnownCameraControl};
 use nokhwa_core::error::NokhwaError;
 use nokhwa_core::frame_format::FrameFormat;
 use nokhwa_core::traits::{AsyncCaptureTrait, AsyncOpenCaptureTrait, CaptureTrait, OpenCaptureTrait};
-use nokhwa_core::types::{ApiBackend, CameraFormat, CameraIndex, CameraInfo, FrameRate, Resolution};
+use nokhwa_core::types::{ApiBackend, CameraFormat, CameraIndex, CameraInformation, FrameRate, Resolution};
 
 async fn resolve_to<T: JsCast>(promise: Promise) -> Result<T, NokhwaError> {
     let future = JsFuture::from(promise);
@@ -91,7 +91,7 @@ pub enum BrowserCameraControls {
 
 
 pub struct BrowserCaptureDevice {
-    info: CameraInfo,
+    info: CameraInformation,
     group_id: String,
     device_id: String,
     format: CameraFormat,
@@ -131,7 +131,7 @@ impl BrowserCaptureDevice {
 
         let info = match device_info {
             Some(v) => {
-                CameraInfo::new(&v.label(), v.kind(), &v.device_id(), index)
+                CameraInformation::new(&v.label(), v.kind(), &v.device_id(), index)
             }
             None => return Err(NokhwaError::OpenDeviceError(index.to_string(), "failed to find MediaDeviceInfo".to_string())),
         };
@@ -297,7 +297,7 @@ impl CaptureTrait for BrowserCaptureDevice {
         ApiBackend::Browser
     }
 
-    fn camera_info(&self) -> &CameraInfo {
+    fn camera_info(&self) -> &CameraInformation {
         &self.info
     }
 

@@ -17,12 +17,12 @@ use nokhwa_core::{
     error::{NokhwaError, NokhwaResult},
     frame_format::FrameFormat,
     properties::CameraProperties,
-    types::{CameraFormat, CameraIndex, CameraInfo, FrameRate, Resolution}
+    types::{CameraFormat, CameraIndex, CameraInformation, FrameRate, Resolution}
 };
 
 pub struct V4L2CaptureDevice {
     device_inner: Arc<DeviceInner>,
-    camera_info: CameraInfo,
+    camera_info: CameraInformation,
     format: Option<CameraFormat>,
     properties: Option<CameraProperties>,
     stream_running: bool,
@@ -32,7 +32,7 @@ impl Open for V4L2CaptureDevice {
     fn open(index: CameraIndex) -> NokhwaResult<Self> {
         let device = DeviceInner::new(index.as_index()? as usize).map_err(|why| NokhwaError::OpenDeviceError(index.to_string(), why.to_string()))?;
         let caps = device.inner().query_caps().map_err(|why| NokhwaError::OpenDeviceError(index.to_string(), why.to_string()))?;
-        let camera_info = CameraInfo::new(caps.card, caps.bus, caps.driver, index);
+        let camera_info = CameraInformation::new(caps.card, caps.bus, caps.driver, index);
         Ok(Self {
             device_inner: Arc::new(device),
             camera_info,

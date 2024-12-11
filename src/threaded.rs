@@ -19,7 +19,7 @@ use nokhwa_core::{
     frame_buffer::FrameBuffer,
     error::NokhwaError,
     types::{
-        ApiBackend, CameraFormat, CameraIndex, CameraInfo,
+        ApiBackend, CameraFormat, CameraIndex, CameraInformation,
         FrameFormat, RequestedFormat, RequestedFormatType, Resolution,
     },
 };
@@ -60,7 +60,7 @@ pub struct CallbackCamera {
     frame_callback: HeldCallbackType,
     last_frame_captured: AtomicLock<FrameBuffer>,
     die_bool: Arc<AtomicBool>,
-    current_camera: CameraInfo,
+    current_camera: CameraInformation,
     handle: AtomicLock<Option<JoinHandle<()>>>,
 }
 
@@ -160,8 +160,8 @@ impl CallbackCamera {
             .set_backend(new_backend)
     }
 
-    /// Gets the camera information such as Name and Index as a [`CameraInfo`].
-    pub fn info(&self) -> &CameraInfo {
+    /// Gets the camera information such as Name and Index as a [`CameraInformation`].
+    pub fn info(&self) -> &CameraInformation {
         &self.current_camera
     }
 

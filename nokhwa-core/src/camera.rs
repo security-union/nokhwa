@@ -1,20 +1,9 @@
-use crate::error::{NokhwaError, NokhwaResult};
+use crate::error::{NokhwaError};
 use crate::frame_format::FrameFormat;
 use crate::properties::{ControlId, ControlValue, Properties};
-use crate::types::{CameraFormat, CameraIndex, FrameRate, Resolution};
+use crate::types::{CameraFormat, FrameRate, Resolution};
 use std::collections::HashMap;
-use crate::frame_buffer::FrameBuffer;
 use crate::stream::Stream;
-
-pub trait Open {
-    fn open(index: CameraIndex) -> NokhwaResult<Self> where Self: Sized;
-}
-
-#[cfg(feature = "async")]
-pub trait AsyncOpen: Sized {
-    async fn open_async(index: CameraIndex) -> NokhwaResult<Self>;
-}
-
 
 pub trait Setting {
     fn enumerate_formats(&self) -> Result<Vec<CameraFormat>, NokhwaError>;
@@ -35,53 +24,42 @@ pub trait Setting {
     ) -> Result<(), NokhwaError>;
 }
 
-// #[cfg(feature = "async")]
-// pub trait AsyncSetting {
-//     async fn set_format_async(&self, camera_format: CameraFormat) -> Result<(), NokhwaError>;
-// 
-//     async fn set_property_async(
-//         &mut self,
-//         property: &CameraPropertyId,
-//         value: CameraPropertyValue,
-//     ) -> Result<(), NokhwaError>;
-// 
-//     def_camera_props_async!(
-//         Brightness,
-//         Contrast,
-//         Hue,
-//         Saturation,
-//         Sharpness,
-//         Gamma,
-//         WhiteBalance,
-//         BacklightCompensation,
-//         Pan,
-//         Tilt,
-//         Zoom,
-//         Exposure,
-//         Iris,
-//         Focus,
-//         Facing,
-//     );
-// }
+#[cfg(feature = "async")]
+pub trait AsyncSetting {
+    async fn enumerate_formats_async(&self) -> Result<Vec<CameraFormat>, NokhwaError>;
+
+    async fn enumerate_resolution_and_frame_rates_async(
+        &self,
+        frame_format: FrameFormat,
+    ) -> Result<HashMap<Resolution, Vec<FrameRate>>, NokhwaError>;
+
+    async fn set_format_async(&self, camera_format: CameraFormat) -> Result<(), NokhwaError>;
+
+    async fn properties_async(&self) -> &Properties;
+
+    async fn set_property_async(
+        &mut self,
+        property: &ControlId,
+        value: ControlValue,
+    ) -> Result<(), NokhwaError>;
+}
 
 pub trait Capture {
+    // Implementations MUST guarantee that there can only ever be one stream open at once.
     fn open_stream(&mut self) -> Result<Stream, NokhwaError>;
 
+    // Implementations MUST be multi-close tolerant.
     fn close_stream(&mut self) -> Result<(), NokhwaError>;
 }
 
 #[cfg(feature = "async")]
 pub trait AsyncStream {
-    async fn open_stream(&mut self) -> Result<(), NokhwaError>;
+    async fn open_stream_async(&mut self) -> Result<Stream, NokhwaError>;
 
-    async fn await_frame(&mut self) -> Result<FrameBuffer, NokhwaError>;
-
-    async fn close_stream(&mut self) -> Result<(), NokhwaError>;
+    async fn close_stream_async(&mut self) -> Result<(), NokhwaError>;
 }
 
-pub trait CameraVtable: Setting + Capture {}
-
-pub trait Camera: Open + CameraVtable {}
+pub trait Camera: Setting + Capture {}
 
 #[cfg(feature = "async")]
-pub trait AsyncCapture: Camera + AsyncOpen + AsyncStream {}
+pub trait AsyncCamera: Camera + AsyncSetting + AsyncStream {}

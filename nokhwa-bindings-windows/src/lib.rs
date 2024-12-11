@@ -31,7 +31,7 @@
 pub mod wmf {
     use nokhwa_core::error::NokhwaError;
     use nokhwa_core::types::{
-        ApiBackend, CameraFormat, CameraIndex, CameraInfo,
+        ApiBackend, CameraFormat, CameraIndex, CameraInformation,
         FrameFormat, KnownCameraControlFlag, Resolution,
     };
     use once_cell::sync::Lazy;
@@ -295,7 +295,7 @@ pub mod wmf {
     fn activate_to_descriptors(
         index: CameraIndex,
         imf_activate: &IMFActivate,
-    ) -> Result<CameraInfo, NokhwaError> {
+    ) -> Result<CameraInformation, NokhwaError> {
         let mut pwstr_name = PWSTR(&mut 0_u16);
         let mut len_pwstrname = 0;
         let mut pwstr_symlink = PWSTR(&mut 0_u16);
@@ -357,7 +357,7 @@ pub mod wmf {
                 })?
         };
 
-        Ok(CameraInfo::new(
+        Ok(CameraInformation::new(
             &name,
             "MediaFoundation Camera",
             &symlink,
@@ -365,7 +365,7 @@ pub mod wmf {
         ))
     }
 
-    pub fn query_media_foundation_descriptors() -> Result<Vec<CameraInfo>, NokhwaError> {
+    pub fn query_media_foundation_descriptors() -> Result<Vec<CameraInformation>, NokhwaError> {
         let mut device_list = vec![];
 
         for (index, activate_ptr) in query_activate_pointers()?.into_iter().enumerate() {
@@ -421,7 +421,7 @@ pub mod wmf {
 
     pub struct MediaFoundationDevice {
         is_open: Cell<bool>,
-        device_specifier: CameraInfo,
+        device_specifier: CameraInformation,
         device_format: CameraFormat,
         source_reader: IMFSourceReader,
     }
@@ -1226,7 +1226,7 @@ pub mod wmf {
 pub mod wmf {
     use nokhwa_core::error::NokhwaError;
     use nokhwa_core::types::{
-        CameraFormat, CameraIndex, CameraInfo,
+        CameraFormat, CameraIndex, CameraInformation,
     };
     use std::borrow::Cow;
     use nokhwa_core::properties::{CameraControl, ControlValue, KnownCameraControl};
@@ -1243,7 +1243,7 @@ pub mod wmf {
         ))
     }
 
-    pub fn query_msmf() -> Result<Vec<CameraInfo>, NokhwaError> {
+    pub fn query_msmf() -> Result<Vec<CameraInformation>, NokhwaError> {
         Err(NokhwaError::NotImplementedError(
             "Not on windows".to_string(),
         ))

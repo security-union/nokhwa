@@ -26,7 +26,7 @@ use nokhwa_core::{
     pixel_format::RgbFormat,
     traits::CaptureTrait,
     types::{
-        ApiBackend, CameraFormat, CameraIndex, CameraInfo,
+        ApiBackend, CameraFormat, CameraIndex, CameraInformation,
         FrameFormat, RequestedFormat, RequestedFormatType, Resolution,
     },
 };
@@ -52,7 +52,7 @@ pub struct AVFoundationCaptureDevice {
     session: Option<AVCaptureSession>,
     data_out: Option<AVCaptureVideoDataOutput>,
     data_collect: Option<AVCaptureVideoCallback>,
-    info: CameraInfo,
+    info: CameraInformation,
     buffer_name: CString,
     format: CameraFormat,
     frame_buffer_receiver: Arc<Receiver<(Vec<u8>, FrameFormat)>>,
@@ -127,7 +127,7 @@ impl CaptureTrait for AVFoundationCaptureDevice {
         ApiBackend::AVFoundation
     }
 
-    fn camera_info(&self) -> &CameraInfo {
+    fn camera_info(&self) -> &CameraInformation {
         &self.info
     }
 
@@ -401,7 +401,7 @@ impl CaptureTrait for AVFoundationCaptureDevice {
         todo!()
     }
 
-    fn camera_info(&self) -> &CameraInfo {
+    fn camera_info(&self) -> &CameraInformation {
         todo!()
     }
 

@@ -1,6 +1,6 @@
 use crate::error::{NokhwaError, NokhwaResult};
 use crate::frame_buffer::FrameBuffer;
-use flume::Receiver;
+use flume::{Receiver, TryRecvError};
 use std::sync::Arc;
 
 pub trait StreamInnerTrait {
@@ -26,12 +26,17 @@ impl Stream {
     //     }
     // }
 
-    pub fn poll_frame(&self) -> NokhwaResult<FrameBuffer> {
+    pub fn check_disconnected(&self) -> NokhwaResult<()> {
         if self.inner.receiver().is_disconnected() {
             return Err(NokhwaError::ReadFrameError(
                 "stream is disconnected!".to_string(),
-            ));
+            ))
         }
+        Ok(())
+    }
+
+    pub fn poll_frame(&self) -> NokhwaResult<FrameBuffer> {
+        self.check_disconnected()?;
 
         self.inner
             .receiver()
@@ -39,34 +44,36 @@ impl Stream {
             .map_err(|why| NokhwaError::ReadFrameError(why.to_string()))
     }
 
-    pub fn try_poll_frame(&self) -> Option<NokhwaResult<FrameBuffer>> {
-        if self.inner.receiver().is_disconnected() {
-            return Some(Err(NokhwaError::ReadFrameError(
-                "stream is disconnected!".to_string(),
-            )));
-        }
+    pub fn try_poll_frame(&self) -> NokhwaResult<Option<FrameBuffer>> {
+        self.check_disconnected()?;
 
         if self.inner.receiver().is_empty() {
-            return None;
+            return Ok(None);
         }
 
-        Some(
-            self.inner
-                .receiver()
-                .try_recv()
-                .map_err(|why| NokhwaError::ReadFrameError(why.to_string())),
-        )
+        let possible_frame = self.inner
+            .receiver()
+            .try_recv();
+
+        match possible_frame {
+            Ok(f) => Ok(Some(f)),
+            Err(why) => {
+                match why {
+                    TryRecvError::Empty => Ok(None),
+                    TryRecvError::Disconnected => Err(NokhwaError::ReadFrameError(
+                        "stream is disconnected!".to_string(),
+                    ))
+                }
+            }
+        }
+
     }
 
     #[cfg(feature = "async")]
     pub async fn await_frame(&self) -> NokhwaResult<FrameBuffer> {
         use futures::TryFutureExt;
 
-        if self.inner.receiver().is_disconnected() {
-            return Err(NokhwaError::ReadFrameError(
-                "stream is disconnected!".to_string(),
-            ));
-        }
+        self.check_disconnected()?;
 
         self.inner
             .receiver()

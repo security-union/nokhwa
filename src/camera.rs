@@ -23,7 +23,7 @@ use nokhwa_core::{
     pixel_format::FormatDecoder,
     traits::CaptureTrait,
     types::{
-        ApiBackend, CameraFormat, CameraIndex, CameraInfo
+        ApiBackend, CameraFormat, CameraIndex, CameraInformation
         , RequestedFormatType, Resolution,
     },
 };
@@ -58,7 +58,7 @@ impl CaptureTrait for Camera {
         todo!()
     }
 
-    fn camera_info(&self) -> &CameraInfo {
+    fn camera_info(&self) -> &CameraInformation {
         todo!()
     }
 

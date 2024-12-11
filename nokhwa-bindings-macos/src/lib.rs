@@ -225,7 +225,7 @@ mod internal {
     use nokhwa_core::{
         error::NokhwaError,
         types::{
-            ApiBackend, CameraFormat, CameraIndex, CameraInfo,
+            ApiBackend, CameraFormat, CameraIndex, CameraInformation,
             FrameFormat,
             KnownCameraControlFlag, Resolution,
         },
@@ -509,7 +509,7 @@ mod internal {
     }
 
     // fuck it, use deprecated APIs
-    pub fn query_avfoundation() -> Result<Vec<CameraInfo>, NokhwaError> {
+    pub fn query_avfoundation() -> Result<Vec<CameraInformation>, NokhwaError> {
         Ok(AVCaptureDeviceDiscoverySession::new(vec![
             AVCaptureDeviceType::UltraWide,
             AVCaptureDeviceType::WideAngle,
@@ -520,7 +520,7 @@ mod internal {
         .devices())
     }
 
-    pub fn get_raw_device_info(index: CameraIndex, device: *mut Object) -> CameraInfo {
+    pub fn get_raw_device_info(index: CameraIndex, device: *mut Object) -> CameraInformation {
         let name = nsstr_to_str(unsafe { msg_send![device, localizedName] });
         let manufacturer = nsstr_to_str(unsafe { msg_send![device, manufacturer] });
         let position: AVCaptureDevicePosition = unsafe { msg_send![device, position] };
@@ -533,7 +533,7 @@ mod internal {
         );
         let misc = nsstr_to_str(unsafe { msg_send![device, uniqueID] });
 
-        CameraInfo::new(name.as_ref(), &description, misc.as_ref(), index)
+        CameraInformation::new(name.as_ref(), &description, misc.as_ref(), index)
     }
 
     #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -818,7 +818,7 @@ mod internal {
             ])
         }
 
-        pub fn devices(&self) -> Vec<CameraInfo> {
+        pub fn devices(&self) -> Vec<CameraInformation> {
             let device_ns_array: *mut Object = unsafe { msg_send![self.inner, devices] };
             let objects_len: NSUInteger = unsafe { NSArray::count(device_ns_array) };
             let mut devices = Vec::with_capacity(objects_len as usize);
@@ -836,7 +836,7 @@ mod internal {
 
     pub struct AVCaptureDevice {
         inner: *mut Object,
-        device: CameraInfo,
+        device: CameraInformation,
         locked: bool,
     }
 
@@ -890,7 +890,7 @@ mod internal {
             })
         }
 
-        pub fn info(&self) -> &CameraInfo {
+        pub fn info(&self) -> &CameraInformation {
             &self.device
         }
 

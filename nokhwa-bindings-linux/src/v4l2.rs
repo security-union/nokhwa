@@ -14,7 +14,7 @@ use nokhwa_core::properties::{CameraProperties, CameraPropertyFlag, CameraProper
 use nokhwa_core::{define_back_and_fourth_control, define_back_and_fourth_frame_format};
 use nokhwa_core::error::{NokhwaError, NokhwaResult};
 use nokhwa_core::frame_format::FrameFormat;
-use nokhwa_core::types::{CameraFormat, CameraIndex, CameraInfo, FrameRate, Resolution};
+use nokhwa_core::types::{CameraFormat, CameraIndex, CameraInformation, FrameRate, Resolution};
 
 const NULL_FCC: &'static [u8; 4] = &[0x00, 0x00, 0x00, 0x00];
 

@@ -20,7 +20,7 @@ use nokhwa_core::{
     error::NokhwaError,
     traits::CaptureTrait,
     types::{
-        ApiBackend, CameraFormat, CameraIndex, CameraInfo,
+        ApiBackend, CameraFormat, CameraIndex, CameraInformation,
         FrameFormat, RequestedFormat, Resolution,
     },
 };
@@ -71,14 +71,14 @@ pub fn known_camera_control_to_video_capture_property(
 ///  - If the [`OpenCvCaptureDevice`] is initialized as a `IPCamera`, the [`CameraFormat`]'s `index` value will be [`u32::MAX`](std::u32::MAX) (4294967295).
 ///  - `OpenCV` does not support camera querying. Camera Name and Camera supported resolution/fps/fourcc is a [`UnsupportedOperationError`](NokhwaError::UnsupportedOperationError).
 /// Note: [`resolution()`](crate::camera_traits::CaptureTrait::resolution()), [`frame_format()`](crate::camera_traits::CaptureTrait::frame_format()), and [`frame_rate()`](crate::camera_traits::CaptureTrait::frame_rate()) is not affected.
-///  - [`CameraInfo`]'s human name will be "`OpenCV` Capture Device {location}"
-///  - [`CameraInfo`]'s description will contain the Camera's Index or IP.
+///  - [`CameraInformation`]'s human name will be "`OpenCV` Capture Device {location}"
+///  - [`CameraInformation`]'s description will contain the Camera's Index or IP.
 ///  - The API Preference order is the native OS API (linux => `v4l2`, mac => `AVFoundation`, windows => `MSMF`) than [`CAP_AUTO`](https://docs.opencv.org/4.5.2/d4/d15/group__videoio__flags__base.html#gga023786be1ee68a9105bf2e48c700294da77ab1fe260fd182f8ec7655fab27a31d)
 #[cfg_attr(feature = "docs-features", doc(cfg(feature = "input-opencv")))]
 pub struct OpenCvCaptureDevice {
     camera_format: CameraFormat,
     camera_location: CameraIndex,
-    camera_info: CameraInfo,
+    camera_info: CameraInformation,
     api_preference: i32,
     video_capture: VideoCapture,
 }
@@ -124,7 +124,7 @@ impl OpenCvCaptureDevice {
 
         set_properties(&mut video_capture, camera_format)?;
 
-        let camera_info = CameraInfo::new(
+        let camera_info = CameraInformation::new(
             format!("OpenCV Capture Device {index}").as_str(),
             index.to_string().as_str(),
             "",
@@ -289,7 +289,7 @@ impl CaptureTrait for OpenCvCaptureDevice {
         ApiBackend::OpenCv
     }
 
-    fn camera_info(&self) -> &CameraInfo {
+    fn camera_info(&self) -> &CameraInformation {
         &self.camera_info
     }
 
