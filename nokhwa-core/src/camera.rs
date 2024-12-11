@@ -1,8 +1,9 @@
 use crate::error::{NokhwaError, NokhwaResult};
 use crate::frame_format::FrameFormat;
-use crate::properties::{CameraProperties, CameraPropertyId, CameraPropertyValue};
+use crate::properties::{ControlId, ControlValue, Properties};
 use crate::types::{CameraFormat, CameraIndex, FrameRate, Resolution};
 use std::collections::HashMap;
+use crate::frame_buffer::FrameBuffer;
 use crate::stream::Stream;
 
 pub trait Open {
@@ -14,33 +15,6 @@ pub trait AsyncOpen: Sized {
     async fn open_async(index: CameraIndex) -> NokhwaResult<Self>;
 }
 
-macro_rules! def_camera_props {
-    ( $($property:ident, )* ) => {
-        paste::paste! {
-            $(
-            fn [<$property:snake>] (&self) -> Option<&crate::properties::CameraPropertyDescriptor> {
-                self.properties().[<$property:snake>]()
-            }
-
-            fn [<set_ $property:snake>]  (&mut self, value: crate::properties::CameraPropertyValue) -> Result<(), crate::error::NokhwaError> {
-                self.set_property(&crate::properties::CameraPropertyId::$property, value)
-            }
-            )*
-        }
-    };
-}
-
-// macro_rules! def_camera_props_async {
-//     ( $($property:ident, )* ) => {
-//         paste::paste! {
-//             $(
-//                 async fn [<set_ $property:snake _async>] (&mut self, value: CameraPropertyValue) -> Result<(), NokhwaError> {
-//                 self.[<set_ $property:snake >](value)
-//             }
-//             )*
-//         }
-//     };
-// }
 
 pub trait Setting {
     fn enumerate_formats(&self) -> Result<Vec<CameraFormat>, NokhwaError>;
@@ -52,31 +26,13 @@ pub trait Setting {
 
     fn set_format(&self, camera_format: CameraFormat) -> Result<(), NokhwaError>;
 
-    fn properties(&self) -> &CameraProperties;
+    fn properties(&self) -> &Properties;
 
     fn set_property(
         &mut self,
-        property: &CameraPropertyId,
-        value: CameraPropertyValue,
+        property: &ControlId,
+        value: ControlValue,
     ) -> Result<(), NokhwaError>;
-
-    def_camera_props!(
-        Brightness,
-        Contrast,
-        Hue,
-        Saturation,
-        Sharpness,
-        Gamma,
-        WhiteBalance,
-        BacklightCompensation,
-        Pan,
-        Tilt,
-        Zoom,
-        Exposure,
-        Iris,
-        Focus,
-        Facing,
-    );
 }
 
 // #[cfg(feature = "async")]
