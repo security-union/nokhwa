@@ -77,6 +77,16 @@ impl FormatDecoder for RgbFormat {
                 .collect()),
             FrameFormat::RAWRGB => Ok(data.to_vec()),
             FrameFormat::NV12 => nv12_to_rgb(resolution, data, false),
+            FrameFormat::BGRA => {
+                let mut rgb = vec![0u8; data.len()];
+                data.chunks_exact(4).enumerate().for_each(|(idx, px)| {
+                    let index = idx * 3;
+                    rgb[index] = px[2];
+                    rgb[index + 1] = px[1];
+                    rgb[index + 2] = px[0];
+                });
+                Ok(rgb)
+            }
         }
     }
 
@@ -112,6 +122,23 @@ impl FormatDecoder for RgbFormat {
                 Ok(())
             }
             FrameFormat::NV12 => buf_nv12_to_rgb(resolution, data, dest, false),
+            FrameFormat::BGRA => {
+                if dest.len() != data.len() / 4 * 3 {
+                    return Err(NokhwaError::ProcessFrameError {
+                        src: fcc,
+                        destination: "BGRA => RGB".to_string(),
+                        error: "Bad buffer length".to_string(),
+                    });
+                }
+
+                data.chunks_exact(4).enumerate().for_each(|(idx, px)| {
+                    let index = idx * 3;
+                    dest[index] = px[2];
+                    dest[index + 1] = px[1];
+                    dest[index + 2] = px[0];
+                });
+                Ok(())
+            }
         }
     }
 }
@@ -151,6 +178,17 @@ impl FormatDecoder for RgbAFormat {
                 .flat_map(|x| [x[0], x[1], x[2], 255])
                 .collect()),
             FrameFormat::NV12 => nv12_to_rgb(resolution, data, true),
+            FrameFormat::BGRA => {
+                let mut rgba = vec![0u8; data.len()];
+                data.chunks_exact(4).enumerate().for_each(|(idx, px)| {
+                    let index = idx * 4;
+                    rgba[index] = px[2];
+                    rgba[index + 1] = px[1];
+                    rgba[index + 2] = px[0];
+                    rgba[index + 3] = px[3];
+                });
+                Ok(rgba)
+            }
         }
     }
 
@@ -194,6 +232,24 @@ impl FormatDecoder for RgbAFormat {
                 Ok(())
             }
             FrameFormat::NV12 => buf_nv12_to_rgb(resolution, data, dest, true),
+            FrameFormat::BGRA => {
+                if dest.len() != data.len() {
+                    return Err(NokhwaError::ProcessFrameError {
+                        src: fcc,
+                        destination: "BGRA => RGBA".to_string(),
+                        error: "Bad buffer length".to_string(),
+                    });
+                }
+
+                data.chunks_exact(4).enumerate().for_each(|(idx, px)| {
+                    let index = idx * 4;
+                    dest[index] = px[2];
+                    dest[index + 1] = px[1];
+                    dest[index + 2] = px[0];
+                    dest[index + 3] = px[3];
+                });
+                Ok(())
+            }
         }
     }
 }
@@ -253,6 +309,10 @@ impl FormatDecoder for LumaFormat {
                 .chunks(3)
                 .map(|px| ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3) as u8)
                 .collect()),
+            FrameFormat::BGRA => Ok(data
+                .chunks_exact(4)
+                .map(|px| ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3) as u8)
+                .collect()),
         }
     }
 
@@ -284,6 +344,12 @@ impl FormatDecoder for LumaFormat {
                 destination: "RGB => RGB".to_string(),
                 error: "Conversion Error".to_string(),
             }),
+            FrameFormat::BGRA => {
+                data.chunks_exact(4).zip(dest.iter_mut()).for_each(|(px, d)| {
+                    *d = ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3) as u8;
+                });
+                Ok(())
+            }
         }
     }
 }
@@ -343,6 +409,16 @@ impl FormatDecoder for LumaAFormat {
                 destination: "RGB => RGB".to_string(),
                 error: "Conversion Error".to_string(),
             }),
+            FrameFormat::BGRA => {
+                let mut luma_a = vec![0u8; data.len() / 4 * 2];
+                data.chunks_exact(4).enumerate().for_each(|(idx, px)| {
+                    let index = idx * 2;
+                    luma_a[index] = ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3)
+                        as u8;
+                    luma_a[index + 1] = px[3];
+                });
+                Ok(luma_a)
+            }
         }
     }
 
@@ -396,6 +472,21 @@ impl FormatDecoder for LumaAFormat {
                 destination: "RGB => RGB".to_string(),
                 error: "Conversion Error".to_string(),
             }),
+            FrameFormat::BGRA => {
+                if dest.len() != data.len() / 4 * 2 {
+                    return Err(NokhwaError::ProcessFrameError {
+                        src: fcc,
+                        destination: "BGRA => LumaA".to_string(),
+                        error: "Conversion Error".to_string(),
+                    });
+                }
+
+                data.chunks_exact(4).zip(dest.chunks_exact_mut(2)).for_each(|(px, d)| {
+                    d[0] = ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3) as u8;
+                    d[1] = px[3];
+                });
+                Ok(())
+            }
         }
     }
 }
