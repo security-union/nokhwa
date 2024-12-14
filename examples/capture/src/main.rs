@@ -305,7 +305,7 @@ fn nokhwa_main() {
             };
             let mut camera = Camera::new(
                 index,
-                RequestedFormat::new::<RgbFormat>(RequestedFormatType::None),
+                RequestedFormat::new::<RgbFormat>(RequestedFormatType::AbsoluteHighestFrameRate),
             )
             .unwrap();
             match kind {
