@@ -1757,11 +1757,13 @@ pub fn buf_nv12_to_rgb(
         });
     }
 
-    if data.len() != ((resolution.width() * resolution.height() * 3) / 2) as usize {
+    let expected = (resolution.width() * resolution.height() * 3) / 2;
+
+    if data.len() != expected as usize {
         return Err(NokhwaError::ProcessFrameError {
             src: FrameFormat::NV12,
             destination: "RGB".to_string(),
-            error: "bad input buffer size".to_string(),
+            error: format!("bad input buffer size, expected {} but got {}", expected, data.len() ),
         });
     }
 
