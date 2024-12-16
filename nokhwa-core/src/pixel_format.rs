@@ -19,7 +19,7 @@ use crate::types::{
     mjpeg_to_rgb, nv12_to_rgb, yuyv422_to_rgb, FrameFormat, Resolution,
 };
 use image::{Luma, LumaA, Pixel, Rgb, Rgba};
-use std::fmt::Debug;
+use std::fmt::{format, Debug};
 
 /// Trait that has methods to convert raw data from the webcam to a proper raw image.
 pub trait FormatDecoder: Clone + Sized + Send + Sync {
@@ -77,6 +77,16 @@ impl FormatDecoder for RgbFormat {
                 .collect()),
             FrameFormat::RAWRGB => Ok(data.to_vec()),
             FrameFormat::NV12 => nv12_to_rgb(resolution, data, false),
+            FrameFormat::BGRA => {
+                let mut rgb = vec![0u8; data.len()];
+                data.chunks_exact(4).enumerate().for_each(|(idx, px)| {
+                    let index = idx * 3;
+                    rgb[index] = px[2];
+                    rgb[index + 1] = px[1];
+                    rgb[index + 2] = px[0];
+                });
+                Ok(rgb)
+            }
         }
     }
 
@@ -112,6 +122,23 @@ impl FormatDecoder for RgbFormat {
                 Ok(())
             }
             FrameFormat::NV12 => buf_nv12_to_rgb(resolution, data, dest, false),
+            FrameFormat::BGRA => {
+                if dest.len() != data.len() / 4 * 3 {
+                    return Err(NokhwaError::ProcessFrameError {
+                        src: fcc,
+                        destination: "BGRA => RGB".to_string(),
+                        error: "Bad buffer length".to_string(),
+                    });
+                }
+
+                data.chunks_exact(4).enumerate().for_each(|(idx, px)| {
+                    let index = idx * 3;
+                    dest[index] = px[2];
+                    dest[index + 1] = px[1];
+                    dest[index + 2] = px[0];
+                });
+                Ok(())
+            }
         }
     }
 }
@@ -151,6 +178,17 @@ impl FormatDecoder for RgbAFormat {
                 .flat_map(|x| [x[0], x[1], x[2], 255])
                 .collect()),
             FrameFormat::NV12 => nv12_to_rgb(resolution, data, true),
+            FrameFormat::BGRA => {
+                let mut rgba = vec![0u8; data.len()];
+                data.chunks_exact(4).enumerate().for_each(|(idx, px)| {
+                    let index = idx * 4;
+                    rgba[index] = px[2];
+                    rgba[index + 1] = px[1];
+                    rgba[index + 2] = px[0];
+                    rgba[index + 3] = px[3];
+                });
+                Ok(rgba)
+            }
         }
     }
 
@@ -194,6 +232,24 @@ impl FormatDecoder for RgbAFormat {
                 Ok(())
             }
             FrameFormat::NV12 => buf_nv12_to_rgb(resolution, data, dest, true),
+            FrameFormat::BGRA => {
+                if dest.len() != data.len() {
+                    return Err(NokhwaError::ProcessFrameError {
+                        src: fcc,
+                        destination: "BGRA => RGBA".to_string(),
+                        error: "Bad buffer length".to_string(),
+                    });
+                }
+
+                data.chunks_exact(4).enumerate().for_each(|(idx, px)| {
+                    let index = idx * 4;
+                    dest[index] = px[2];
+                    dest[index + 1] = px[1];
+                    dest[index + 2] = px[0];
+                    dest[index + 3] = px[3];
+                });
+                Ok(())
+            }
         }
     }
 }
@@ -253,6 +309,10 @@ impl FormatDecoder for LumaFormat {
                 .chunks(3)
                 .map(|px| ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3) as u8)
                 .collect()),
+            FrameFormat::BGRA => Ok(data
+                .chunks_exact(4)
+                .map(|px| ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3) as u8)
+                .collect()),
         }
     }
 
@@ -284,6 +344,12 @@ impl FormatDecoder for LumaFormat {
                 destination: "RGB => RGB".to_string(),
                 error: "Conversion Error".to_string(),
             }),
+            FrameFormat::BGRA => {
+                data.chunks_exact(4).zip(dest.iter_mut()).for_each(|(px, d)| {
+                    *d = ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3) as u8;
+                });
+                Ok(())
+            }
         }
     }
 }
@@ -343,6 +409,16 @@ impl FormatDecoder for LumaAFormat {
                 destination: "RGB => RGB".to_string(),
                 error: "Conversion Error".to_string(),
             }),
+            FrameFormat::BGRA => {
+                let mut luma_a = vec![0u8; data.len() / 4 * 2];
+                data.chunks_exact(4).enumerate().for_each(|(idx, px)| {
+                    let index = idx * 2;
+                    luma_a[index] = ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3)
+                        as u8;
+                    luma_a[index + 1] = px[3];
+                });
+                Ok(luma_a)
+            }
         }
     }
 
@@ -396,6 +472,21 @@ impl FormatDecoder for LumaAFormat {
                 destination: "RGB => RGB".to_string(),
                 error: "Conversion Error".to_string(),
             }),
+            FrameFormat::BGRA => {
+                if dest.len() != data.len() / 4 * 2 {
+                    return Err(NokhwaError::ProcessFrameError {
+                        src: fcc,
+                        destination: "BGRA => LumaA".to_string(),
+                        error: "Conversion Error".to_string(),
+                    });
+                }
+
+                data.chunks_exact(4).zip(dest.chunks_exact_mut(2)).for_each(|(px, d)| {
+                    d[0] = ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3) as u8;
+                    d[1] = px[3];
+                });
+                Ok(())
+            }
         }
     }
 }
@@ -426,7 +517,10 @@ impl FormatDecoder for YuyvFormat {
                 );
                 Ok(i420)
             }
-            _ => Err(NokhwaError::GeneralError("Invalid FrameFormat".into())),
+            _ => Err(NokhwaError::GeneralError(format!(
+                "Invalid FrameFormat: {:?}",
+                fcc
+            ))),
         }
     }
 
@@ -447,7 +541,19 @@ impl FormatDecoder for YuyvFormat {
                 )?;
                 Ok(())
             }
-            _ => Err(NokhwaError::GeneralError("Invalid FrameFormat".into())),
+
+            FrameFormat::NV12 => {
+                let i420 = nv12_to_i420(data, resolution.width() as usize, resolution.height() as usize);
+                // Slice the enough tata to fill the destination buffer, i420 is larger so we need to slice it
+                let i420 = &i420[..dest.len()];
+
+                dest.copy_from_slice(&i420);
+                Ok(())
+            }
+            _ => Err(NokhwaError::GeneralError(format!(
+                "Invalid FrameFormat: {:?}",
+                fcc
+            ))),
         }
     }
 }
@@ -520,4 +626,43 @@ fn convert_yuyv_to_i420_direct(
     }
 
     Ok(())
+}
+
+fn nv12_to_i420(nv12: &[u8], width: usize, height: usize) -> Vec<u8> {
+    let y_plane_size = width * height; // Y plane size
+    let uv_plane_size = y_plane_size / 2; // UV plane size
+    let single_frame_size = y_plane_size + uv_plane_size;
+
+    // Debugging information
+
+    // Validate buffer size
+    // assert_eq!(
+    //     nv12.len() % single_frame_size,
+    //     0,
+    //     "NV12 buffer size is not a multiple of the single frame size"
+    // );
+    
+
+    // Extract the first frame if the buffer contains multiple frames
+    let valid_nv12 = &nv12[..single_frame_size];
+
+    // Allocate space for I420 (Y + U + V planes)
+    let mut i420 = vec![0u8; single_frame_size];
+
+    // Copy the Y plane
+    i420[..y_plane_size].copy_from_slice(&valid_nv12[..y_plane_size]);
+
+    // Extract the UV plane (interleaved)
+    let uv_plane = &valid_nv12[y_plane_size..];
+
+    // Write U and V planes directly to the I420 buffer using indices
+    for (i, chunk) in uv_plane.chunks(2).enumerate() {
+        let u_index = y_plane_size + i; // Start of U plane
+        let v_index = y_plane_size + uv_plane_size / 2 + i; // Start of V plane
+
+        i420[u_index] = chunk[0]; // U value
+        i420[v_index] = chunk[1]; // V value
+    }
+
+    i420
 }

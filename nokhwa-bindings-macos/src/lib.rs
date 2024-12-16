@@ -214,7 +214,7 @@ mod internal {
         foundation::{NSArray, NSDictionary, NSInteger, NSString, NSUInteger},
     };
     use core_media_sys::{
-        kCMPixelFormat_24RGB, kCMPixelFormat_422YpCbCr8_yuvs,
+        kCMPixelFormat_24RGB, kCMPixelFormat_32BGRA, kCMPixelFormat_422YpCbCr8_yuvs,
         kCMPixelFormat_8IndexedGray_WhiteIsZero, kCMVideoCodecType_422YpCbCr8,
         kCMVideoCodecType_JPEG, kCMVideoCodecType_JPEG_OpenDML, CMFormatDescriptionGetMediaSubType,
         CMFormatDescriptionRef, CMSampleBufferRef, CMTime, CMVideoDimensions,
@@ -373,6 +373,7 @@ mod internal {
             | kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
             | 875704438 => Some(FrameFormat::NV12),
             kCMPixelFormat_24RGB => Some(FrameFormat::RAWRGB),
+            kCMPixelFormat_32BGRA => Some(FrameFormat::BGRA),
             _ => None,
         }
     }
@@ -2284,6 +2285,7 @@ mod internal {
                 FrameFormat::GRAY => kCMPixelFormat_8IndexedGray_WhiteIsZero,
                 FrameFormat::NV12 => kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
                 FrameFormat::RAWRGB => kCMPixelFormat_24RGB,
+                FrameFormat::BGRA => kCMPixelFormat_32BGRA,
             };
             let obj = CFNumber::from(cmpixelfmt as i32);
             let obj = obj.as_CFTypeRef() as *mut Object;

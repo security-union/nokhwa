@@ -175,6 +175,7 @@ CaptureBackendTrait {
         let pxwidth = match cfmt.format() {
             FrameFormat::MJPEG | FrameFormat::YUYV | FrameFormat::RAWRGB | FrameFormat::NV12 => 3,
             FrameFormat::GRAY => 1,
+            FrameFormat::BGRA => 4,
         };
         if alpha {
             return (resolution.width() * resolution.height() * (pxwidth + 1)) as usize;
