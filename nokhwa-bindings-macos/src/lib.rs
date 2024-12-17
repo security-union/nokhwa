@@ -983,11 +983,9 @@ mod internal {
             let mut selected_range: *mut Object = std::ptr::null_mut();
 
             for format in format_list {
-                println!("format {:?}", format);
                 let format_desc_ref: CMFormatDescriptionRef =
                     unsafe { msg_send![format.internal, performSelector: format_description_sel] };
                 let dimensions = unsafe { CMVideoFormatDescriptionGetDimensions(format_desc_ref) };
-                println!("dimensions {:?}", dimensions);
                 if dimensions.height == descriptor.resolution().height() as i32
                     && dimensions.width == descriptor.resolution().width() as i32
                 {

@@ -546,7 +546,7 @@ impl FormatDecoder for I420Format {
             FrameFormat::NV12 => {
                 let i420 = nv12_to_i420(data, resolution.width() as usize, resolution.height() as usize);
                 // Slice the enough tata to fill the destination buffer, i420 is larger so we need to slice it
-                let i420 = &i420[..dest.len()];
+                // let i420 = &i420[..dest.len()];
                 dest.copy_from_slice(&i420);
                 Ok(())
             }
@@ -649,41 +649,36 @@ fn convert_yuyv_to_i420_direct(
 }
 
 fn nv12_to_i420(nv12: &[u8], width: usize, height: usize) -> Vec<u8> {
-    let y_plane_size = width * height; // Y plane size
-    let uv_plane_size = y_plane_size / 2; // UV plane size
-    let single_frame_size = y_plane_size + uv_plane_size;
+    assert!(
+        width % 2 == 0 && height % 2 == 0,
+        "Width and height must be even numbers."
+    );
 
-    // Debugging information
-
-    // Validate buffer size
-    // assert_eq!(
-    //     nv12.len() % single_frame_size,
-    //     0,
-    //     "NV12 buffer size is not a multiple of the single frame size"
-    // );
-    
-
-    // Extract the first frame if the buffer contains multiple frames
-    let valid_nv12 = &nv12[..single_frame_size];
+    let y_plane_size = width * height;
+    let uv_plane_size = y_plane_size / 2; // Interleaved UV plane size
+    let u_plane_size = uv_plane_size / 2;
 
     // Allocate space for I420 (Y + U + V planes)
-    let mut i420 = vec![0u8; single_frame_size];
+    let mut i420 = vec![0u8; y_plane_size + 2 * u_plane_size];
 
-    // Copy the Y plane
-    i420[..y_plane_size].copy_from_slice(&valid_nv12[..y_plane_size]);
+    let (y_plane, uv_plane) = i420.split_at_mut(y_plane_size);
+    let (u_plane, v_plane) = uv_plane.split_at_mut(u_plane_size);
 
-    // Extract the UV plane (interleaved)
-    let uv_plane = &valid_nv12[y_plane_size..];
+    // Step 1: Copy Y plane
+    y_plane.copy_from_slice(&nv12[..y_plane_size]);
 
-    // Write U and V planes directly to the I420 buffer using indices
-    for (i, chunk) in uv_plane.chunks(2).enumerate() {
-        let u_index = y_plane_size + i; // Start of U plane
-        let v_index = y_plane_size + uv_plane_size / 2 + i; // Start of V plane
+    // Step 2: Process interleaved UV data
+    let nv12_uv = &nv12[y_plane_size..];
 
-        i420[u_index] = chunk[0]; // U value
-        i420[v_index] = chunk[1]; // V value
+    for row in 0..(height / 2) {
+        for col in 0..(width / 2) {
+            let nv12_index = row * width + col * 2; // Index in NV12 interleaved UV plane
+            let uv_index = row * (width / 2) + col; // Index in U and V planes
+
+            u_plane[uv_index] = nv12_uv[nv12_index];     // U value
+            v_plane[uv_index] = nv12_uv[nv12_index + 1]; // V value
+        }
     }
 
     i420
 }
-
