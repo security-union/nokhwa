@@ -496,9 +496,10 @@ impl FormatDecoder for LumaAFormat {
 /// let image: ImageBuffer<Rgb<u8>, Vec<u8>> = buffer.to_image::<YuyvFormat>();
 /// ```
 #[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct YuyvFormat;
+pub struct I420Format;
 
-impl FormatDecoder for YuyvFormat {
+impl FormatDecoder for I420Format {
+    // YUV 4:2:0 planar colors. but we need to change the image crate to use this format
     type Output = Rgb<u8>;
     const FORMATS: &'static [FrameFormat] = color_frame_formats();
 
@@ -518,7 +519,7 @@ impl FormatDecoder for YuyvFormat {
                 Ok(i420)
             }
             _ => Err(NokhwaError::GeneralError(format!(
-                "Invalid FrameFormat: {:?}",
+                "Invalid FrameFormat in write_output: {:?}",
                 fcc
             ))),
         }
@@ -546,12 +547,31 @@ impl FormatDecoder for YuyvFormat {
                 let i420 = nv12_to_i420(data, resolution.width() as usize, resolution.height() as usize);
                 // Slice the enough tata to fill the destination buffer, i420 is larger so we need to slice it
                 let i420 = &i420[..dest.len()];
-
                 dest.copy_from_slice(&i420);
                 Ok(())
             }
+
+            FrameFormat::BGRA => {
+                // transform the BGRA buffer to I420 and write it to the destination buffer using loop
+                for i in 0..resolution.width() as usize * resolution.height() as usize {
+                    let index = i * 4;
+                    let y_index = i;
+                    let u_index = resolution.width() as usize * resolution.height() as usize + i / 2;
+                    let v_index = resolution.width() as usize * resolution.height() as usize + i / 2 + 1;
+                    let b = data[index];
+                    let g = data[index + 1];
+                    let r = data[index + 2];
+                    dest[y_index] = (0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32) as u8;
+                    if i % 2 == 0 {
+                        dest[u_index] = (0.492 * (b as f32 - dest[y_index] as f32)) as u8;
+                        dest[v_index] = (0.877 * (r as f32 - dest[y_index] as f32)) as u8;
+                    }
+                }
+                Ok(())
+            },
+
             _ => Err(NokhwaError::GeneralError(format!(
-                "Invalid FrameFormat: {:?}",
+                "Invalid FrameFormat in write_output_buffer: {:?}",
                 fcc
             ))),
         }
@@ -666,3 +686,4 @@ fn nv12_to_i420(nv12: &[u8], width: usize, height: usize) -> Vec<u8> {
 
     i420
 }
+

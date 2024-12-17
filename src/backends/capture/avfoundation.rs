@@ -70,6 +70,7 @@ impl AVFoundationCaptureDevice {
 
         // device.lock()?;
         let formats = device.supported_formats()?;
+        // formats debug
         let camera_fmt = req_fmt.fulfill(&formats).ok_or_else(|| {
             NokhwaError::OpenDeviceError("Cannot fulfill request".to_string(), req_fmt.to_string())
         })?;
