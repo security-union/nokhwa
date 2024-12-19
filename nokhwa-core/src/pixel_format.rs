@@ -546,27 +546,17 @@ impl FormatDecoder for I420Format {
             FrameFormat::NV12 => {
                 let i420 = nv12_to_i420(data, resolution.width() as usize, resolution.height() as usize);
                 // Slice the enough tata to fill the destination buffer, i420 is larger so we need to slice it
-                // let i420 = &i420[..dest.len()];
+                let i420 = &i420[..dest.len()];
                 dest.copy_from_slice(&i420);
                 Ok(())
             }
 
             FrameFormat::BGRA => {
-                // transform the BGRA buffer to I420 and write it to the destination buffer using loop
-                for i in 0..resolution.width() as usize * resolution.height() as usize {
-                    let index = i * 4;
-                    let y_index = i;
-                    let u_index = resolution.width() as usize * resolution.height() as usize + i / 2;
-                    let v_index = resolution.width() as usize * resolution.height() as usize + i / 2 + 1;
-                    let b = data[index];
-                    let g = data[index + 1];
-                    let r = data[index + 2];
-                    dest[y_index] = (0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32) as u8;
-                    if i % 2 == 0 {
-                        dest[u_index] = (0.492 * (b as f32 - dest[y_index] as f32)) as u8;
-                        dest[v_index] = (0.877 * (r as f32 - dest[y_index] as f32)) as u8;
-                    }
-                }
+                // transform the BGRA buffer to i420 and write it to the destination buffer
+                let i420 = nv12_to_i420(data, resolution.width() as usize, resolution.height() as usize);
+                // Slice the enough tata to fill the destination buffer, i420 is larger so we need to slice it
+                let i420 = &i420[..dest.len()];
+                dest.copy_from_slice(&i420);
                 Ok(())
             },
 

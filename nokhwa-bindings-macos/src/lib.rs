@@ -512,14 +512,15 @@ mod internal {
 
     // fuck it, use deprecated APIs
     pub fn query_avfoundation() -> Result<Vec<CameraInfo>, NokhwaError> {
-        Ok(AVCaptureDeviceDiscoverySession::new(vec![
+        let devices = AVCaptureDeviceDiscoverySession::new(vec![
             AVCaptureDeviceType::UltraWide,
             AVCaptureDeviceType::WideAngle,
             AVCaptureDeviceType::Telephoto,
             AVCaptureDeviceType::TrueDepth,
             AVCaptureDeviceType::External,
         ])?
-        .devices())
+        .devices();            
+        Ok(devices)
     }
 
     pub fn get_raw_device_info(index: CameraIndex, device: *mut Object) -> CameraInfo {
