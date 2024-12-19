@@ -19,7 +19,7 @@ use crate::types::{
     mjpeg_to_rgb, nv12_to_rgb, yuyv422_to_rgb, FrameFormat, Resolution,
 };
 use image::{Luma, LumaA, Pixel, Rgb, Rgba};
-use std::fmt::{format, Debug};
+use std::fmt::Debug;
 
 /// Trait that has methods to convert raw data from the webcam to a proper raw image.
 pub trait FormatDecoder: Clone + Sized + Send + Sync {

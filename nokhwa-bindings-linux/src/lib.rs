@@ -541,6 +541,7 @@ mod internal {
                 FrameFormat::GRAY => FourCC::new(b"GRAY"),
                 FrameFormat::RAWRGB => FourCC::new(b"RGB3"),
                 FrameFormat::NV12 => FourCC::new(b"NV12"),
+                FrameFormat::BGRA => FourCC::new(b"BGRA"),
             };
 
             let format = Format::new(new_fmt.width(), new_fmt.height(), v4l_fcc);
@@ -913,6 +914,7 @@ mod internal {
             "GRAY" => Some(FrameFormat::GRAY),
             "RGB3" => Some(FrameFormat::RAWRGB),
             "NV12" => Some(FrameFormat::NV12),
+            "BGRA" => Some(FrameFormat::BGRA),
             _ => None,
         }
     }
@@ -924,6 +926,7 @@ mod internal {
             FrameFormat::GRAY => FourCC::new(b"GRAY"),
             FrameFormat::RAWRGB => FourCC::new(b"RGB3"),
             FrameFormat::NV12 => FourCC::new(b"NV12"),
+            FrameFormat::BGRA => FourCC::new(b"BGRA"),
         }
     }
 }
