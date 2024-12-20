@@ -544,19 +544,12 @@ impl FormatDecoder for I420Format {
             }
 
             FrameFormat::NV12 => {
-                let i420 = nv12_to_i420(data, resolution.width() as usize, resolution.height() as usize);
-                // Slice the enough tata to fill the destination buffer, i420 is larger so we need to slice it
-                let i420 = &i420[..dest.len()];
-                dest.copy_from_slice(&i420);
+                nv12_to_i420(data, resolution.width() as usize, resolution.height() as usize, dest);
                 Ok(())
             }
 
             FrameFormat::BGRA => {
-                // transform the BGRA buffer to i420 and write it to the destination buffer
-                let i420 = nv12_to_i420(data, resolution.width() as usize, resolution.height() as usize);
-                // Slice the enough tata to fill the destination buffer, i420 is larger so we need to slice it
-                let i420 = &i420[..dest.len()];
-                dest.copy_from_slice(&i420);
+                bgra_to_i420(data, resolution.width() as usize, resolution.height() as usize, dest);
                 Ok(())
             },
 
@@ -638,7 +631,7 @@ fn convert_yuyv_to_i420_direct(
     Ok(())
 }
 
-fn nv12_to_i420(nv12: &[u8], width: usize, height: usize) -> Vec<u8> {
+fn nv12_to_i420(nv12: &[u8], width: usize, height: usize,  i420: &mut [u8]) {
     assert!(
         width % 2 == 0 && height % 2 == 0,
         "Width and height must be even numbers."
@@ -647,9 +640,6 @@ fn nv12_to_i420(nv12: &[u8], width: usize, height: usize) -> Vec<u8> {
     let y_plane_size = width * height;
     let uv_plane_size = y_plane_size / 2; // Interleaved UV plane size
     let u_plane_size = uv_plane_size / 2;
-
-    // Allocate space for I420 (Y + U + V planes)
-    let mut i420 = vec![0u8; y_plane_size + 2 * u_plane_size];
 
     let (y_plane, uv_plane) = i420.split_at_mut(y_plane_size);
     let (u_plane, v_plane) = uv_plane.split_at_mut(u_plane_size);
@@ -669,6 +659,59 @@ fn nv12_to_i420(nv12: &[u8], width: usize, height: usize) -> Vec<u8> {
             v_plane[uv_index] = nv12_uv[nv12_index + 1]; // V value
         }
     }
+}
 
-    i420
+/// Converts an image in BGRA format to I420 (YUV 4:2:0) format.
+///
+/// # Arguments
+/// - `bgra`: Input buffer containing the BGRA pixel data.
+/// - `width`: Width of the image.
+/// - `height`: Height of the image.
+/// - `i420`: Output buffer to store the I420 data.
+///            Must have at least `width * height * 3 / 2` bytes allocated.
+fn bgra_to_i420(bgra: &[u8], width: usize, height: usize, i420: &mut [u8]) {
+    assert_eq!(bgra.len(), width * height * 4, "Invalid BGRA buffer size");
+    assert!(i420.len() >= width * height * 3 / 2, "Insufficient I420 buffer size");
+
+    let (y_plane, uv_planes) = i420.split_at_mut(width * height);
+    let (u_plane, v_plane) = uv_planes.split_at_mut(width * height / 4);
+
+    for y in 0..height {
+        for x in 0..width {
+            let bgra_index = (y * width + x) * 4;
+            let b = bgra[bgra_index] as f32;
+            let g = bgra[bgra_index + 1] as f32;
+            let r = bgra[bgra_index + 2] as f32;
+
+            // Calculate Y, U, V components
+            let y_value = (0.257 * r + 0.504 * g + 0.098 * b + 16.0).round() as u8;
+            let u_value = (-0.148 * r - 0.291 * g + 0.439 * b + 128.0).round() as u8;
+            let v_value = (0.439 * r - 0.368 * g - 0.071 * b + 128.0).round() as u8;
+
+            y_plane[y * width + x] = y_value;
+
+            if y % 2 == 0 && x % 2 == 0 {
+                let uv_index = (y / 2) * (width / 2) + (x / 2);
+                u_plane[uv_index] = u_value;
+                v_plane[uv_index] = v_value;
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::pixel_format::private_convert_yuyv_to_i420;
+
+
+    #[test]
+    fn test_yuyv_to_i420() {
+        let yuyv = include_bytes!("../assets/test/chichen_itza.yuyv");
+        let expected_i420 = include_bytes!("../assets/test/chichen_itza.i420");
+        let width = 1280;
+        let height = 720;
+        let result = private_convert_yuyv_to_i420(yuyv, width, height);
+        assert_eq!(result, expected_i420);
+    }
+
 }
