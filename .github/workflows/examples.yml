@@ -30,3 +30,21 @@ jobs:
         run: |
           cd examples/threaded-capture
           cargo check
+  run_core_tests:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+
+      - name: Cargo Test
+        run: |
+          cd nokhwa-core
+          cargo test
