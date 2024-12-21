@@ -345,9 +345,11 @@ impl FormatDecoder for LumaFormat {
                 error: "Conversion Error".to_string(),
             }),
             FrameFormat::BGRA => {
-                data.chunks_exact(4).zip(dest.iter_mut()).for_each(|(px, d)| {
-                    *d = ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3) as u8;
-                });
+                data.chunks_exact(4)
+                    .zip(dest.iter_mut())
+                    .for_each(|(px, d)| {
+                        *d = ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3) as u8;
+                    });
                 Ok(())
             }
         }
@@ -413,8 +415,8 @@ impl FormatDecoder for LumaAFormat {
                 let mut luma_a = vec![0u8; data.len() / 4 * 2];
                 data.chunks_exact(4).enumerate().for_each(|(idx, px)| {
                     let index = idx * 2;
-                    luma_a[index] = ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3)
-                        as u8;
+                    luma_a[index] =
+                        ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3) as u8;
                     luma_a[index + 1] = px[3];
                 });
                 Ok(luma_a)
@@ -481,17 +483,17 @@ impl FormatDecoder for LumaAFormat {
                     });
                 }
 
-                data.chunks_exact(4).zip(dest.chunks_exact_mut(2)).for_each(|(px, d)| {
-                    d[0] = ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3) as u8;
-                    d[1] = px[3];
-                });
+                data.chunks_exact(4)
+                    .zip(dest.chunks_exact_mut(2))
+                    .for_each(|(px, d)| {
+                        d[0] = ((i32::from(px[0]) + i32::from(px[1]) + i32::from(px[2])) / 3) as u8;
+                        d[1] = px[3];
+                    });
                 Ok(())
             }
         }
     }
 }
-
-
 
 /// let image: ImageBuffer<Rgb<u8>, Vec<u8>> = buffer.to_image::<YuyvFormat>();
 /// ```
@@ -511,11 +513,8 @@ impl FormatDecoder for I420Format {
     ) -> Result<Vec<u8>, NokhwaError> {
         match fcc {
             FrameFormat::YUYV => {
-                let i420 = private_convert_yuyv_to_i420(
-                    data,
-                    resolution.width() as usize,
-                    resolution.height() as usize,
-                );
+                let mut i420 = vec![0u8; resolution.width() as usize * resolution.height() as usize * 3 / 2];
+                convert_yuyv_to_i420_direct(data, resolution.width() as usize, resolution.height() as usize, &mut i420)?;
                 Ok(i420)
             }
             _ => Err(NokhwaError::GeneralError(format!(
@@ -536,22 +535,32 @@ impl FormatDecoder for I420Format {
             FrameFormat::YUYV => {
                 convert_yuyv_to_i420_direct(
                     data,
-                    dest,
                     resolution.width() as usize,
                     resolution.height() as usize,
+                    dest,
                 )?;
                 Ok(())
             }
 
             FrameFormat::NV12 => {
-                nv12_to_i420(data, resolution.width() as usize, resolution.height() as usize, dest);
+                nv12_to_i420(
+                    data,
+                    resolution.width() as usize,
+                    resolution.height() as usize,
+                    dest,
+                );
                 Ok(())
             }
 
             FrameFormat::BGRA => {
-                bgra_to_i420(data, resolution.width() as usize, resolution.height() as usize, dest);
+                bgra_to_i420(
+                    data,
+                    resolution.width() as usize,
+                    resolution.height() as usize,
+                    dest,
+                );
                 Ok(())
-            },
+            }
 
             _ => Err(NokhwaError::GeneralError(format!(
                 "Invalid FrameFormat in write_output_buffer: {:?}",
@@ -561,42 +570,20 @@ impl FormatDecoder for I420Format {
     }
 }
 
-fn private_convert_yuyv_to_i420(yuyv: &[u8], width: usize, height: usize) -> Vec<u8> {
-    assert!(
-        width % 2 == 0 && height % 2 == 0,
-        "Width and height must be even numbers."
-    );
-
-    let mut i420 = vec![0u8; width * height + 2 * (width / 2) * (height / 2)];
-    let (y_plane, uv_plane) = i420.split_at_mut(width * height);
-    let (u_plane, v_plane) = uv_plane.split_at_mut(uv_plane.len() / 2);
-
-    for y in 0..height {
-        for x in (0..width).step_by(2) {
-            let base_index = (y * width + x) * 2;
-            let y0 = yuyv[base_index];
-            let u = yuyv[base_index + 1];
-            let y1 = yuyv[base_index + 2];
-            let v = yuyv[base_index + 3];
-
-            y_plane[y * width + x] = y0;
-            y_plane[y * width + x + 1] = y1;
-
-            if y % 2 == 0 {
-                u_plane[y / 2 * (width / 2) + x / 2] = u;
-                v_plane[y / 2 * (width / 2) + x / 2] = v;
-            }
-        }
-    }
-
-    i420
-}
-
+/// Converts an image in YUYV format to I420 (YUV 4:2:0) format.
+/// YUYV format is a packed format with two Y samples followed by one U and one V sample.
+/// I420 format is a planar format with Y plane followed by U and V planes.
+/// The U and V planes are half the width and height of the Y plane.
+/// # Arguments
+/// - `yuyv`: Input buffer containing the YUYV pixel data.
+/// - `width`: Width of the image.
+/// - `height`: Height of the image.
+/// - `dest`: Output buffer to store the I420 data.
 fn convert_yuyv_to_i420_direct(
     yuyv: &[u8],
-    dest: &mut [u8],
     width: usize,
     height: usize,
+    dest: &mut [u8],
 ) -> Result<(), NokhwaError> {
     // Ensure the destination buffer is large enough
     if dest.len() < width * height + 2 * (width / 2) * (height / 2) {
@@ -631,7 +618,16 @@ fn convert_yuyv_to_i420_direct(
     Ok(())
 }
 
-fn nv12_to_i420(nv12: &[u8], width: usize, height: usize,  i420: &mut [u8]) {
+/// Converts an image in NV12 format to I420 (YUV 4:2:0) format.
+/// NV12 format is a planar format with Y plane followed by interleaved UV plane.
+/// I420 format is a planar format with Y plane followed by U and V planes.
+/// The U and V planes are half the width and height of the Y plane.
+/// # Arguments
+/// - `nv12`: Input buffer containing the NV12 pixel data.
+/// - `width`: Width of the image.
+/// - `height`: Height of the image.
+/// - `i420`: Output buffer to store the I420 data.s
+fn nv12_to_i420(nv12: &[u8], width: usize, height: usize, i420: &mut [u8]) {
     assert!(
         width % 2 == 0 && height % 2 == 0,
         "Width and height must be even numbers."
@@ -655,7 +651,7 @@ fn nv12_to_i420(nv12: &[u8], width: usize, height: usize,  i420: &mut [u8]) {
             let nv12_index = row * width + col * 2; // Index in NV12 interleaved UV plane
             let uv_index = row * (width / 2) + col; // Index in U and V planes
 
-            u_plane[uv_index] = nv12_uv[nv12_index];     // U value
+            u_plane[uv_index] = nv12_uv[nv12_index]; // U value
             v_plane[uv_index] = nv12_uv[nv12_index + 1]; // V value
         }
     }
@@ -671,7 +667,10 @@ fn nv12_to_i420(nv12: &[u8], width: usize, height: usize,  i420: &mut [u8]) {
 ///            Must have at least `width * height * 3 / 2` bytes allocated.
 fn bgra_to_i420(bgra: &[u8], width: usize, height: usize, i420: &mut [u8]) {
     assert_eq!(bgra.len(), width * height * 4, "Invalid BGRA buffer size");
-    assert!(i420.len() >= width * height * 3 / 2, "Insufficient I420 buffer size");
+    assert!(
+        i420.len() >= width * height * 3 / 2,
+        "Insufficient I420 buffer size"
+    );
 
     let (y_plane, uv_planes) = i420.split_at_mut(width * height);
     let (u_plane, v_plane) = uv_planes.split_at_mut(width * height / 4);
@@ -701,17 +700,81 @@ fn bgra_to_i420(bgra: &[u8], width: usize, height: usize, i420: &mut [u8]) {
 
 #[cfg(test)]
 mod tests {
-    use crate::pixel_format::private_convert_yuyv_to_i420;
+    fn assert_i420_equal_with_epsilon(epsilon_y: u8, epsilon_u: u8, epsilon_v: u8, actual: &[u8], expected: &[u8], width: usize, height: usize) {
+        assert_eq!(actual.len(), expected.len());
+        let (actual_y, actual_uv) = actual.split_at(width * height);
+        let (actual_u, actual_v) = actual_uv.split_at(actual_uv.len() / 2);
 
+        let (expected_y, expected_uv) = expected.split_at(width * height);
+        let (expected_u, expected_v) = expected_uv.split_at(expected_uv.len() / 2);
+
+        // Validate Y plane
+        for (i, (&actual, &expected)) in actual_y.iter().zip(expected_y.iter()).enumerate() {
+            assert!(
+                (actual as i32 - expected as i32).abs() <= epsilon_y as i32,
+                "Y plane mismatch at index {}: actual = {}, expected = {}",
+                i,
+                actual,
+                expected
+            );
+        }
+
+        // Validate U plane
+        for (i, (&actual, &expected)) in actual_u.iter().zip(expected_u.iter()).enumerate() {
+            assert!(
+                (actual as i32 - expected as i32).abs() <= epsilon_u as i32,
+                "U plane mismatch at index {}: actual = {}, expected = {}",
+                i,
+                actual,
+                expected
+            );
+        }
+
+        // Validate V plane
+        for (i, (&actual, &expected)) in actual_v.iter().zip(expected_v.iter()).enumerate() {
+            assert!(
+                (actual as i32 - expected as i32).abs() <= epsilon_v as i32,
+                "V plane mismatch at index {}: actual = {}, expected = {}",
+                i,
+                actual,
+                expected
+            );
+        }
+    }
 
     #[test]
     fn test_yuyv_to_i420() {
-        let yuyv = include_bytes!("../assets/test/chichen_itza.yuyv");
-        let expected_i420 = include_bytes!("../assets/test/chichen_itza.i420");
+        let yuyv = include_bytes!("../tests/assets/chichen_itza.yuyv");
+        let expected_i420 = include_bytes!("../tests/assets/chichen_itza.yuyv_i420");
         let width = 1280;
-        let height = 720;
-        let result = private_convert_yuyv_to_i420(yuyv, width, height);
-        assert_eq!(result, expected_i420);
+        let height = 680;
+        let mut actual = vec![0u8; width * height * 3 / 2];
+        super::convert_yuyv_to_i420_direct(yuyv, width, height, &mut actual).unwrap();
+        // I generated the expected I420 data using ffmpeg, so we allow some error in the conversion
+        assert_i420_equal_with_epsilon(0, 5, 5, &actual, expected_i420, width, height);
     }
 
+    #[test]
+    fn test_bgra_to_i420() {
+        let bgra = include_bytes!("../tests/assets/chichen_itza.bgra");
+        let expected_i420 = include_bytes!("../tests/assets/chichen_itza.bgra_i420");
+        let width = 1280;
+        let height = 680;
+        let mut actual = vec![0u8; width * height * 3 / 2];
+        super::bgra_to_i420(bgra, width, height, &mut actual);
+        // I generated the expected I420 data using ffmpeg, so we allow some error in the conversion
+        assert_i420_equal_with_epsilon(1, 6, 6, &actual, expected_i420, width, height);
+    }
+
+    #[test]
+    fn test_nv12_to_i420() {
+        let nv12 = include_bytes!("../tests/assets/chichen_itza.nv12");
+        let expected_i420 = include_bytes!("../tests/assets/chichen_itza.nv12_i420");
+        let width = 1280;
+        let height = 680;
+        let mut actual = vec![0u8; width * height * 3 / 2];
+        super::nv12_to_i420(nv12, width, height, &mut actual);
+        // I generated the expected I420 data using ffmpeg, so we allow some error in the conversion
+        assert_i420_equal_with_epsilon(0, 0, 0, &actual, expected_i420, width, height);
+    }
 }

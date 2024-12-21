@@ -299,7 +299,7 @@ pub enum FrameFormat {
     NV12,
     GRAY,
     RAWRGB,
-    BGRA
+    BGRA,
 }
 
 impl Display for FrameFormat {
@@ -354,7 +354,7 @@ pub const fn frame_formats() -> &'static [FrameFormat] {
         FrameFormat::NV12,
         FrameFormat::GRAY,
         FrameFormat::RAWRGB,
-        FrameFormat::BGRA
+        FrameFormat::BGRA,
     ]
 }
 
@@ -366,7 +366,7 @@ pub const fn color_frame_formats() -> &'static [FrameFormat] {
         FrameFormat::YUYV,
         FrameFormat::NV12,
         FrameFormat::RAWRGB,
-        FrameFormat::BGRA
+        FrameFormat::BGRA,
     ]
 }
 
@@ -1485,21 +1485,23 @@ pub fn mjpeg_to_rgb(data: &[u8], rgba: bool) -> Result<Vec<u8>, NokhwaError> {
 
     let scanlines_res = match jpeg_decompress.read_scanlines::<u8>() {
         Ok(v) => v,
-        Err(why) => return Err(NokhwaError::ProcessFrameError {
-            src: FrameFormat::MJPEG,
-            destination: "JPEG".to_string(),
-            error: why.to_string(),
-        })
+        Err(why) => {
+            return Err(NokhwaError::ProcessFrameError {
+                src: FrameFormat::MJPEG,
+                destination: "JPEG".to_string(),
+                error: why.to_string(),
+            })
+        }
     };
     // assert!(jpeg_decompress.finish_decompress());
-    jpeg_decompress.finish().map_err(|why| {
-        NokhwaError::ProcessFrameError {
+    jpeg_decompress
+        .finish()
+        .map_err(|why| NokhwaError::ProcessFrameError {
             src: FrameFormat::MJPEG,
             destination: "RGB888".to_string(),
             error: why.to_string(),
-        }
-    })?;
-    
+        })?;
+
     Ok(scanlines_res)
 }
 
@@ -1555,21 +1557,21 @@ pub fn buf_mjpeg_to_rgb(data: &[u8], dest: &mut [u8], rgba: bool) -> Result<(), 
         });
     }
 
-    jpeg_decompress.read_scanlines_into::<u8>(dest).map_err(|why| {
-        NokhwaError::ProcessFrameError {
+    jpeg_decompress
+        .read_scanlines_into::<u8>(dest)
+        .map_err(|why| NokhwaError::ProcessFrameError {
             src: FrameFormat::MJPEG,
             destination: "RGB888".to_string(),
             error: why.to_string(),
-        }
-    })?;
+        })?;
     // assert!(jpeg_decompress.finish_decompress());
-    jpeg_decompress.finish().map_err(|why| {
-         NokhwaError::ProcessFrameError {
+    jpeg_decompress
+        .finish()
+        .map_err(|why| NokhwaError::ProcessFrameError {
             src: FrameFormat::MJPEG,
             destination: "RGB888".to_string(),
             error: why.to_string(),
-        }
-    })?;
+        })?;
     Ok(())
 }
 
