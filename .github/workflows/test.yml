@@ -8,12 +8,11 @@ on:
   pull_request: {}
     
 
-name: Compile all examples
+name: Compile and test Nokhwa Core
 
-# We specify the examples individually since they might need a different environment
 jobs:
-  compile_example_threaded_capture:
-    name: Check
+  run_core_tests:
+    name: Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -26,7 +25,7 @@ jobs:
           toolchain: nightly
           override: true
 
-      - name: Cargo Check 
+      - name: Cargo Test
         run: |
-          cd examples/threaded-capture
-          cargo check
+          cd nokhwa-core
+          cargo test
