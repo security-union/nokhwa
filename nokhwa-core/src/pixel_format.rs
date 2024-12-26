@@ -691,15 +691,8 @@ fn bgra_to_i420(bgra: &[u8], width: usize, height: usize, i420: &mut [u8]) {
 
 #[cfg(test)]
 mod tests {
-    use std::f32::EPSILON;
-
-    use image::ImageReader;
-
     use super::RgbFormat;
-    use crate::{
-        pixel_format::{FormatDecoder, YuyvFormat},
-        types::buf_mjpeg_to_rgb,
-    };
+    use crate::pixel_format::FormatDecoder;
 
     fn assert_i420_equal_with_epsilon(
         epsilon_y: u8,
@@ -807,7 +800,7 @@ mod tests {
             let epsilon = 0;
             assert!(
                 (actual as i32 - expected as i32).abs() <= epsilon as i32,
-                "Y plane mismatch at index {}: actual = {:#X}, expected = {:#X}",
+                "data mismatch at index {}: actual = {:#X}, expected = {:#X}",
                 i,
                 actual,
                 expected
