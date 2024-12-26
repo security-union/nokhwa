@@ -27,3 +27,12 @@ ffmpeg -i chichen_itza.jpg -f rawvideo -pix_fmt nv12 chichen_itza.nv12
 ffmpeg -f rawvideo -pix_fmt nv12 -s 1280x680 -i chichen_itza.nv12 -f rawvideo -pix_fmt yuv420p chichen_itza.nv12_i420
 ```
 
+### JPEG to RGB24
+```
+ffmpeg -i chichen_itza.jpg -pix_fmt rgb24 chichen_itza.rgb
+```
+
+### BGRA to RGB24
+```
+ffmpeg -f rawvideo -pix_fmt bgra -s 1280x680 -i chichen_itza.bgra -f rawvideo -pix_fmt rgb24 chichen_itza.rgb
+```

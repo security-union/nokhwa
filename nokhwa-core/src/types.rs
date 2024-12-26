@@ -1821,3 +1821,57 @@ pub fn buf_nv12_to_rgb(
 
     Ok(())
 }
+
+
+#[allow(clippy::similar_names)]
+#[inline]
+pub fn buf_bgra_to_rgb(
+    resolution: Resolution,
+    data: &[u8],
+    out: &mut [u8],
+) -> Result<(), NokhwaError> {
+    let width = resolution.width();
+    let height = resolution.height();
+    
+    if width % 2 != 0 || height % 2 != 0 {
+        return Err(NokhwaError::ProcessFrameError {
+            src: FrameFormat::BGRA,
+            destination: "RGB".to_string(),
+            error: "bad resolution".to_string(),
+        });
+    }
+
+    let input_size = (width * height * 4) as usize; // BGRA is 4 bytes per pixel
+    let output_size = (width * height * 3) as usize; // RGB is 3 bytes per pixel
+
+    if data.len() != input_size {
+        return Err(NokhwaError::ProcessFrameError {
+            src: FrameFormat::BGRA,
+            destination: "RGB".to_string(),
+            error: "bad input buffer size".to_string(),
+        });
+    }
+
+    if out.len() != output_size {
+        return Err(NokhwaError::ProcessFrameError {
+            src: FrameFormat::BGRA,
+            destination: "RGB".to_string(),
+            error: "bad output buffer size".to_string(),
+        });
+    }
+
+    for (idx, chunk) in data.chunks_exact(4).enumerate() {
+        // BGRA Format: [Blue, Green, Red, Alpha]
+        let b = chunk[0];
+        let g = chunk[1];
+        let r = chunk[2];
+        // let _a = chunk[3]; // Alpha is ignored for RGB
+
+        let out_idx = idx * 3; // 3 bytes per pixel in RGB
+        out[out_idx] = r;      // Red
+        out[out_idx + 1] = g;  // Green
+        out[out_idx + 2] = b;  // Blue
+    }
+
+    Ok(())
+}

@@ -15,8 +15,7 @@
  */
 use crate::error::NokhwaError;
 use crate::types::{
-    buf_mjpeg_to_rgb, buf_nv12_to_rgb, buf_yuyv422_to_rgb, color_frame_formats, frame_formats,
-    mjpeg_to_rgb, nv12_to_rgb, yuyv422_to_rgb, FrameFormat, Resolution,
+    buf_bgra_to_rgb, buf_mjpeg_to_rgb, buf_nv12_to_rgb, buf_yuyv422_to_rgb, color_frame_formats, frame_formats, mjpeg_to_rgb, nv12_to_rgb, yuyv422_to_rgb, FrameFormat, Resolution
 };
 use image::{Luma, LumaA, Pixel, Rgb, Rgba};
 use std::fmt::Debug;
@@ -123,21 +122,7 @@ impl FormatDecoder for RgbFormat {
             }
             FrameFormat::NV12 => buf_nv12_to_rgb(resolution, data, dest, false),
             FrameFormat::BGRA => {
-                if dest.len() != data.len() / 4 * 3 {
-                    return Err(NokhwaError::ProcessFrameError {
-                        src: fcc,
-                        destination: "BGRA => RGB".to_string(),
-                        error: "Bad buffer length".to_string(),
-                    });
-                }
-
-                data.chunks_exact(4).enumerate().for_each(|(idx, px)| {
-                    let index = idx * 3;
-                    dest[index] = px[2];
-                    dest[index + 1] = px[1];
-                    dest[index + 2] = px[0];
-                });
-                Ok(())
+                buf_bgra_to_rgb(resolution, data, dest)
             }
         }
     }
@@ -498,9 +483,9 @@ impl FormatDecoder for LumaAFormat {
 /// let image: ImageBuffer<Rgb<u8>, Vec<u8>> = buffer.to_image::<YuyvFormat>();
 /// ```
 #[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct I420Format;
+pub struct YuyvFormat;
 
-impl FormatDecoder for I420Format {
+impl FormatDecoder for YuyvFormat {
     // YUV 4:2:0 planar colors. but we need to change the image crate to use this format
     type Output = Rgb<u8>;
     const FORMATS: &'static [FrameFormat] = color_frame_formats();
@@ -513,8 +498,14 @@ impl FormatDecoder for I420Format {
     ) -> Result<Vec<u8>, NokhwaError> {
         match fcc {
             FrameFormat::YUYV => {
-                let mut i420 = vec![0u8; resolution.width() as usize * resolution.height() as usize * 3 / 2];
-                convert_yuyv_to_i420_direct(data, resolution.width() as usize, resolution.height() as usize, &mut i420)?;
+                let mut i420 =
+                    vec![0u8; resolution.width() as usize * resolution.height() as usize * 3 / 2];
+                convert_yuyv_to_i420_direct(
+                    data,
+                    resolution.width() as usize,
+                    resolution.height() as usize,
+                    &mut i420,
+                )?;
                 Ok(i420)
             }
             _ => Err(NokhwaError::GeneralError(format!(
@@ -700,7 +691,25 @@ fn bgra_to_i420(bgra: &[u8], width: usize, height: usize, i420: &mut [u8]) {
 
 #[cfg(test)]
 mod tests {
-    fn assert_i420_equal_with_epsilon(epsilon_y: u8, epsilon_u: u8, epsilon_v: u8, actual: &[u8], expected: &[u8], width: usize, height: usize) {
+    use std::f32::EPSILON;
+
+    use image::ImageReader;
+
+    use super::RgbFormat;
+    use crate::{
+        pixel_format::{FormatDecoder, YuyvFormat},
+        types::buf_mjpeg_to_rgb,
+    };
+
+    fn assert_i420_equal_with_epsilon(
+        epsilon_y: u8,
+        epsilon_u: u8,
+        epsilon_v: u8,
+        actual: &[u8],
+        expected: &[u8],
+        width: usize,
+        height: usize,
+    ) {
         assert_eq!(actual.len(), expected.len());
         let (actual_y, actual_uv) = actual.split_at(width * height);
         let (actual_u, actual_v) = actual_uv.split_at(actual_uv.len() / 2);
@@ -743,7 +752,7 @@ mod tests {
     }
 
     #[test]
-    fn test_yuyv_to_i420() {
+    fn yuyv_to_i420() {
         let yuyv = include_bytes!("../tests/assets/chichen_itza.yuyv");
         let expected_i420 = include_bytes!("../tests/assets/chichen_itza.yuyv_i420");
         let width = 1280;
@@ -755,7 +764,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bgra_to_i420() {
+    fn bgra_to_i420() {
         let bgra = include_bytes!("../tests/assets/chichen_itza.bgra");
         let expected_i420 = include_bytes!("../tests/assets/chichen_itza.bgra_i420");
         let width = 1280;
@@ -767,7 +776,7 @@ mod tests {
     }
 
     #[test]
-    fn test_nv12_to_i420() {
+    fn nv12_to_i420() {
         let nv12 = include_bytes!("../tests/assets/chichen_itza.nv12");
         let expected_i420 = include_bytes!("../tests/assets/chichen_itza.nv12_i420");
         let width = 1280;
@@ -776,5 +785,33 @@ mod tests {
         super::nv12_to_i420(nv12, width, height, &mut actual);
         // I generated the expected I420 data using ffmpeg, so we allow some error in the conversion
         assert_i420_equal_with_epsilon(0, 0, 0, &actual, expected_i420, width, height);
+    }
+
+    #[test]
+    fn buf_bgra_to_rgb() {
+        let input_bgra = include_bytes!("../tests/assets/chichen_itza.bgra");
+        let expected_rgb = include_bytes!("../tests/assets/chichen_itza.rgb");
+        let width = 1280;
+        let height = 680;
+        let mut actual = vec![0u8; input_bgra.len() / 4 * 3];
+
+        RgbFormat::write_output_buffer(
+            super::FrameFormat::BGRA,
+            super::Resolution::new(width as u32, height as u32),
+            input_bgra,
+            &mut actual,
+        )
+        .unwrap();
+        assert_eq!(actual.len(), expected_rgb.len());
+        for (i, (&actual, &expected)) in actual.iter().zip(expected_rgb.iter()).enumerate() {
+            let epsilon = 0;
+            assert!(
+                (actual as i32 - expected as i32).abs() <= epsilon as i32,
+                "Y plane mismatch at index {}: actual = {:#X}, expected = {:#X}",
+                i,
+                actual,
+                expected
+            );
+        }
     }
 }
