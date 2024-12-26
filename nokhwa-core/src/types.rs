@@ -1822,7 +1822,6 @@ pub fn buf_nv12_to_rgb(
     Ok(())
 }
 
-
 #[allow(clippy::similar_names)]
 #[inline]
 pub fn buf_bgra_to_rgb(
@@ -1832,7 +1831,7 @@ pub fn buf_bgra_to_rgb(
 ) -> Result<(), NokhwaError> {
     let width = resolution.width();
     let height = resolution.height();
-    
+
     if width % 2 != 0 || height % 2 != 0 {
         return Err(NokhwaError::ProcessFrameError {
             src: FrameFormat::BGRA,
@@ -1868,9 +1867,9 @@ pub fn buf_bgra_to_rgb(
         // let _a = chunk[3]; // Alpha is ignored for RGB
 
         let out_idx = idx * 3; // 3 bytes per pixel in RGB
-        out[out_idx] = r;      // Red
-        out[out_idx + 1] = g;  // Green
-        out[out_idx + 2] = b;  // Blue
+        out[out_idx] = r; // Red
+        out[out_idx + 1] = g; // Green
+        out[out_idx + 2] = b; // Blue
     }
 
     Ok(())

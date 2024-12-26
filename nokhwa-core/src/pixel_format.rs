@@ -15,7 +15,8 @@
  */
 use crate::error::NokhwaError;
 use crate::types::{
-    buf_bgra_to_rgb, buf_mjpeg_to_rgb, buf_nv12_to_rgb, buf_yuyv422_to_rgb, color_frame_formats, frame_formats, mjpeg_to_rgb, nv12_to_rgb, yuyv422_to_rgb, FrameFormat, Resolution
+    buf_bgra_to_rgb, buf_mjpeg_to_rgb, buf_nv12_to_rgb, buf_yuyv422_to_rgb, color_frame_formats,
+    frame_formats, mjpeg_to_rgb, nv12_to_rgb, yuyv422_to_rgb, FrameFormat, Resolution,
 };
 use image::{Luma, LumaA, Pixel, Rgb, Rgba};
 use std::fmt::Debug;
@@ -121,9 +122,7 @@ impl FormatDecoder for RgbFormat {
                 Ok(())
             }
             FrameFormat::NV12 => buf_nv12_to_rgb(resolution, data, dest, false),
-            FrameFormat::BGRA => {
-                buf_bgra_to_rgb(resolution, data, dest)
-            }
+            FrameFormat::BGRA => buf_bgra_to_rgb(resolution, data, dest),
         }
     }
 }
@@ -797,13 +796,10 @@ mod tests {
         .unwrap();
         assert_eq!(actual.len(), expected_rgb.len());
         for (i, (&actual, &expected)) in actual.iter().zip(expected_rgb.iter()).enumerate() {
-            let epsilon = 0;
-            assert!(
-                (actual as i32 - expected as i32).abs() <= epsilon as i32,
-                "data mismatch at index {}: actual = {:#X}, expected = {:#X}",
-                i,
-                actual,
-                expected
+            assert_eq!(
+                actual, expected,
+                "Mismatch at index {} expected {:#X} actual {:#X}",
+                i, expected, actual
             );
         }
     }
