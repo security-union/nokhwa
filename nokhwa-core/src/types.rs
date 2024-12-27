@@ -299,6 +299,7 @@ pub enum FrameFormat {
     NV12,
     GRAY,
     RAWRGB,
+    BGRA,
 }
 
 impl Display for FrameFormat {
@@ -319,6 +320,9 @@ impl Display for FrameFormat {
             FrameFormat::NV12 => {
                 write!(f, "NV12")
             }
+            FrameFormat::BGRA => {
+                write!(f, "BGRA")
+            }
         }
     }
 }
@@ -332,6 +336,7 @@ impl FromStr for FrameFormat {
             "GRAY" => Ok(FrameFormat::GRAY),
             "RAWRGB" => Ok(FrameFormat::RAWRGB),
             "NV12" => Ok(FrameFormat::NV12),
+            "BGRA" => Ok(FrameFormat::BGRA),
             _ => Err(NokhwaError::StructureError {
                 structure: "FrameFormat".to_string(),
                 error: format!("No match for {s}"),
@@ -349,6 +354,7 @@ pub const fn frame_formats() -> &'static [FrameFormat] {
         FrameFormat::NV12,
         FrameFormat::GRAY,
         FrameFormat::RAWRGB,
+        FrameFormat::BGRA,
     ]
 }
 
@@ -360,6 +366,7 @@ pub const fn color_frame_formats() -> &'static [FrameFormat] {
         FrameFormat::YUYV,
         FrameFormat::NV12,
         FrameFormat::RAWRGB,
+        FrameFormat::BGRA,
     ]
 }
 
@@ -1478,21 +1485,23 @@ pub fn mjpeg_to_rgb(data: &[u8], rgba: bool) -> Result<Vec<u8>, NokhwaError> {
 
     let scanlines_res = match jpeg_decompress.read_scanlines::<u8>() {
         Ok(v) => v,
-        Err(why) => return Err(NokhwaError::ProcessFrameError {
-            src: FrameFormat::MJPEG,
-            destination: "JPEG".to_string(),
-            error: why.to_string(),
-        })
+        Err(why) => {
+            return Err(NokhwaError::ProcessFrameError {
+                src: FrameFormat::MJPEG,
+                destination: "JPEG".to_string(),
+                error: why.to_string(),
+            })
+        }
     };
     // assert!(jpeg_decompress.finish_decompress());
-    jpeg_decompress.finish().map_err(|why| {
-        NokhwaError::ProcessFrameError {
+    jpeg_decompress
+        .finish()
+        .map_err(|why| NokhwaError::ProcessFrameError {
             src: FrameFormat::MJPEG,
             destination: "RGB888".to_string(),
             error: why.to_string(),
-        }
-    })?;
-    
+        })?;
+
     Ok(scanlines_res)
 }
 
@@ -1548,21 +1557,21 @@ pub fn buf_mjpeg_to_rgb(data: &[u8], dest: &mut [u8], rgba: bool) -> Result<(), 
         });
     }
 
-    jpeg_decompress.read_scanlines_into::<u8>(dest).map_err(|why| {
-        NokhwaError::ProcessFrameError {
+    jpeg_decompress
+        .read_scanlines_into::<u8>(dest)
+        .map_err(|why| NokhwaError::ProcessFrameError {
             src: FrameFormat::MJPEG,
             destination: "RGB888".to_string(),
             error: why.to_string(),
-        }
-    })?;
+        })?;
     // assert!(jpeg_decompress.finish_decompress());
-    jpeg_decompress.finish().map_err(|why| {
-         NokhwaError::ProcessFrameError {
+    jpeg_decompress
+        .finish()
+        .map_err(|why| NokhwaError::ProcessFrameError {
             src: FrameFormat::MJPEG,
             destination: "RGB888".to_string(),
             error: why.to_string(),
-        }
-    })?;
+        })?;
     Ok(())
 }
 
@@ -1750,11 +1759,13 @@ pub fn buf_nv12_to_rgb(
         });
     }
 
-    if data.len() != ((resolution.width() * resolution.height() * 3) / 2) as usize {
+    let expected_len = ((resolution.width() * resolution.height() * 3) / 2) as usize;
+
+    if data.len() != expected_len {
         return Err(NokhwaError::ProcessFrameError {
             src: FrameFormat::NV12,
             destination: "RGB".to_string(),
-            error: "bad input buffer size".to_string(),
+            error: format!("bad input buffer size, expected {} but got {}", expected_len, data.len()),
         });
     }
 
@@ -1808,6 +1819,59 @@ pub fn buf_nv12_to_rgb(
                 out[base_index + 5] = px1[2];
             }
         }
+    }
+
+    Ok(())
+}
+
+#[allow(clippy::similar_names)]
+#[inline]
+pub fn buf_bgra_to_rgb(
+    resolution: Resolution,
+    data: &[u8],
+    out: &mut [u8],
+) -> Result<(), NokhwaError> {
+    let width = resolution.width();
+    let height = resolution.height();
+
+    if width % 2 != 0 || height % 2 != 0 {
+        return Err(NokhwaError::ProcessFrameError {
+            src: FrameFormat::BGRA,
+            destination: "RGB".to_string(),
+            error: "bad resolution".to_string(),
+        });
+    }
+
+    let input_size = (width * height * 4) as usize; // BGRA is 4 bytes per pixel
+    let output_size = (width * height * 3) as usize; // RGB is 3 bytes per pixel
+
+    if data.len() != input_size {
+        return Err(NokhwaError::ProcessFrameError {
+            src: FrameFormat::BGRA,
+            destination: "RGB".to_string(),
+            error: "bad input buffer size".to_string(),
+        });
+    }
+
+    if out.len() != output_size {
+        return Err(NokhwaError::ProcessFrameError {
+            src: FrameFormat::BGRA,
+            destination: "RGB".to_string(),
+            error: "bad output buffer size".to_string(),
+        });
+    }
+
+    for (idx, chunk) in data.chunks_exact(4).enumerate() {
+        // BGRA Format: [Blue, Green, Red, Alpha]
+        let b = chunk[0];
+        let g = chunk[1];
+        let r = chunk[2];
+        // let _a = chunk[3]; // Alpha is ignored for RGB
+
+        let out_idx = idx * 3; // 3 bytes per pixel in RGB
+        out[out_idx] = r; // Red
+        out[out_idx + 1] = g; // Green
+        out[out_idx + 2] = b; // Blue
     }
 
     Ok(())
