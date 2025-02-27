@@ -214,7 +214,7 @@ mod internal {
         foundation::{NSArray, NSDictionary, NSInteger, NSString, NSUInteger},
     };
     use core_media_sys::{
-        kCMPixelFormat_24RGB, kCMPixelFormat_422YpCbCr8_yuvs,
+        kCMPixelFormat_24RGB, kCMPixelFormat_32BGRA, kCMPixelFormat_422YpCbCr8_yuvs,
         kCMPixelFormat_8IndexedGray_WhiteIsZero, kCMVideoCodecType_422YpCbCr8,
         kCMVideoCodecType_JPEG, kCMVideoCodecType_JPEG_OpenDML, CMFormatDescriptionGetMediaSubType,
         CMFormatDescriptionRef, CMSampleBufferRef, CMTime, CMVideoDimensions,
@@ -373,6 +373,7 @@ mod internal {
             | kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
             | 875704438 => Some(FrameFormat::NV12),
             kCMPixelFormat_24RGB => Some(FrameFormat::RAWRGB),
+            kCMPixelFormat_32BGRA => Some(FrameFormat::BGRA),
             _ => None,
         }
     }
@@ -511,14 +512,15 @@ mod internal {
 
     // fuck it, use deprecated APIs
     pub fn query_avfoundation() -> Result<Vec<CameraInfo>, NokhwaError> {
-        Ok(AVCaptureDeviceDiscoverySession::new(vec![
+        let devices = AVCaptureDeviceDiscoverySession::new(vec![
             AVCaptureDeviceType::UltraWide,
             AVCaptureDeviceType::WideAngle,
             AVCaptureDeviceType::Telephoto,
             AVCaptureDeviceType::TrueDepth,
             AVCaptureDeviceType::External,
         ])?
-        .devices())
+        .devices();
+        Ok(devices)
     }
 
     pub fn get_raw_device_info(index: CameraIndex, device: *mut Object) -> CameraInfo {
@@ -571,9 +573,7 @@ mod internal {
                 AVCaptureDeviceType::TrueDepth => {
                     str_to_nsstr("AVCaptureDeviceTypeBuiltInTrueDepthCamera")
                 }
-                AVCaptureDeviceType::External => {
-                    str_to_nsstr("AVCaptureDeviceTypeExternal")
-                }
+                AVCaptureDeviceType::External => str_to_nsstr("AVCaptureDeviceTypeExternal"),
             }
         }
     }
@@ -973,6 +973,7 @@ mod internal {
         // thank you ffmpeg
         pub fn set_all(&mut self, descriptor: CameraFormat) -> Result<(), NokhwaError> {
             self.lock()?;
+            println!("Spaceballs format: {:?}", descriptor);
             let format_list = try_ns_arr_to_vec::<AVCaptureDeviceFormat, NokhwaError>(unsafe {
                 msg_send![self.inner, formats]
             })?;
@@ -985,7 +986,6 @@ mod internal {
                 let format_desc_ref: CMFormatDescriptionRef =
                     unsafe { msg_send![format.internal, performSelector: format_description_sel] };
                 let dimensions = unsafe { CMVideoFormatDescriptionGetDimensions(format_desc_ref) };
-
                 if dimensions.height == descriptor.resolution().height() as i32
                     && dimensions.width == descriptor.resolution().width() as i32
                 {
@@ -1010,21 +1010,6 @@ mod internal {
                     error: "Not Found/Rejected/Unsupported".to_string(),
                 });
             }
-
-            let activefmtkey = str_to_nsstr("activeFormat");
-            let min_frame_duration = str_to_nsstr("minFrameDuration");
-            let active_video_min_frame_duration = str_to_nsstr("activeVideoMinFrameDuration");
-            let active_video_max_frame_duration = str_to_nsstr("activeVideoMaxFrameDuration");
-            let _: () =
-                unsafe { msg_send![self.inner, setValue:selected_format forKey:activefmtkey] };
-            let min_frame_duration: *mut Object =
-                unsafe { msg_send![selected_range, valueForKey: min_frame_duration] };
-            let _: () = unsafe {
-                msg_send![self.inner, setValue:min_frame_duration forKey:active_video_min_frame_duration]
-            };
-            let _: () = unsafe {
-                msg_send![self.inner, setValue:min_frame_duration forKey:active_video_max_frame_duration]
-            };
             self.unlock();
             Ok(())
         }
@@ -2278,13 +2263,16 @@ mod internal {
         }
 
         pub fn set_frame_format(&self, format: FrameFormat) -> Result<(), NokhwaError> {
+            println!("setting format {}", format);
             let cmpixelfmt = match format {
                 FrameFormat::YUYV => kCMPixelFormat_422YpCbCr8_yuvs,
                 FrameFormat::MJPEG => kCMVideoCodecType_JPEG,
                 FrameFormat::GRAY => kCMPixelFormat_8IndexedGray_WhiteIsZero,
-                FrameFormat::NV12 => kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
+                FrameFormat::NV12 => kCMPixelFormat_422YpCbCr8_yuvs,
                 FrameFormat::RAWRGB => kCMPixelFormat_24RGB,
+                FrameFormat::BGRA => kCMPixelFormat_32BGRA,
             };
+            
             let obj = CFNumber::from(cmpixelfmt as i32);
             let obj = obj.as_CFTypeRef() as *mut Object;
             let key = unsafe { kCVPixelBufferPixelFormatTypeKey } as *mut Object;
